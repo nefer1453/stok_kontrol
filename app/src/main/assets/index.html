@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b2f24" />
+  <title>stok_kontrol</title>
+  <style>
+    :root{
+      --bg:#071a14;
+      --panel:#0b2f24;
+      --panel2:#083026;
+      --line:rgba(250,204,21,.25);
+      --text:#e7f7ef;
+      --muted:rgba(231,247,239,.65);
+      --gold:#facc15;
+      --green:#16a34a;
+      --red:#ef4444;
+      --amber:#f59e0b;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --r:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:radial-gradient(1100px 500px at 20% 0%, rgba(250,204,21,.08), transparent 50%),
+                           radial-gradient(900px 600px at 100% 100%, rgba(22,163,74,.12), transparent 55%),
+                           var(--bg);
+      color:var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      overflow-x:hidden;
+    }
+    .topbar{
+      position:sticky; top:0; z-index:30;
+      padding:12px 12px 10px;
+      backdrop-filter: blur(10px);
+      background: linear-gradient(to bottom, rgba(7,26,20,.92), rgba(7,26,20,.65));
+      border-bottom:1px solid rgba(250,204,21,.12);
+    }
+    .toprow{display:flex; align-items:center; gap:10px}
+    .btnIcon{
+      border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(11,47,36,.85), rgba(8,48,38,.6));
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:14px;
+      box-shadow: var(--shadow);
+      cursor:pointer;
+      user-select:none;
+    }
+    .titlePill{
+      flex:1;
+      border:1px solid rgba(250,204,21,.18);
+      border-radius:16px;
+      padding:10px 12px;
+      background:rgba(11,47,36,.55);
+      box-shadow: var(--shadow);
+      min-width:0;
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .titlePill .small{color:var(--muted); font-size:12px}
+    .titlePill .big{font-weight:800; letter-spacing:.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .searchRow{margin-top:10px; display:none}
+    .searchRow.show{display:block}
+    .inp{
+      width:100%;
+      padding:14px 14px;
+      border-radius:16px;
+      border:1px solid rgba(250,204,21,.18);
+      outline:none;
+      background:rgba(11,47,36,.55);
+      color:var(--text);
+      font-size:16px;
+    }
+    .main{padding:14px 12px 96px}
+    .card{
+      background:linear-gradient(180deg, rgba(11,47,36,.85), rgba(8,48,38,.62));
+      border:1px solid rgba(250,204,21,.16);
+      border-radius:22px;
+      box-shadow: var(--shadow);
+      padding:14px;
+      margin-bottom:12px;
+    }
+    .row{display:flex; gap:10px; align-items:center}
+    .space{justify-content:space-between}
+    .h{font-weight:900; letter-spacing:.2px}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid rgba(250,204,21,.25);
+      background:rgba(0,0,0,.12);
+      color:var(--text);
+      font-size:12px;
+      white-space:nowrap;
+    }
+    .pill.badge{font-weight:800}
+    .pill.crit{border-color:rgba(239,68,68,.35); background:rgba(239,68,68,.14)}
+    .pill.warn{border-color:rgba(245,158,11,.35); background:rgba(245,158,11,.14)}
+    .pill.ok{border-color:rgba(22,163,74,.35); background:rgba(22,163,74,.14)}
+    .muted{color:var(--muted)}
+    .btn{
+      padding:12px 14px;
+      border-radius:16px;
+      border:1px solid rgba(250,204,21,.22);
+      background:linear-gradient(180deg, rgba(250,204,21,.16), rgba(250,204,21,.06));
+      color:var(--text);
+      font-weight:900;
+      cursor:pointer;
+      box-shadow: var(--shadow);
+    }
+    .btn.danger{
+      border-color:rgba(239,68,68,.35);
+      background:linear-gradient(180deg, rgba(239,68,68,.18), rgba(239,68,68,.07));
+    }
+    .listHint{font-size:12px; color:var(--muted); margin:0 2px 10px}
+    .selectBanner{
+      margin-top:10px;
+      display:none;
+      border:1px solid rgba(250,204,21,.22);
+      border-radius:18px;
+      padding:10px 12px;
+      background:rgba(11,47,36,.55);
+      box-shadow: var(--shadow);
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .selectBanner.show{display:flex}
+    .bannerLeft{min-width:0}
+    .bannerLeft .b1{font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .bannerLeft .b2{font-size:12px; color:var(--muted)}
+    .drawer{
+      position:fixed; inset:0;
+      display:none; z-index:40;
+      background:rgba(0,0,0,.45);
+    }
+    .drawer.show{display:block}
+    .drawerPanel{
+      position:absolute; left:0; top:0; bottom:0;
+      width:min(320px, 88vw);
+      background:linear-gradient(180deg, rgba(11,47,36,.96), rgba(8,48,38,.90));
+      border-right:1px solid rgba(250,204,21,.14);
+      box-shadow: 20px 0 50px rgba(0,0,0,.4);
+      padding:14px;
+    }
+    .drawerTitle{font-weight:950; margin:6px 2px 10px}
+    .menuItem{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 12px;
+      border-radius:16px;
+      border:1px solid rgba(250,204,21,.14);
+      background:rgba(0,0,0,.10);
+      margin-bottom:10px;
+      cursor:pointer;
+    }
+    .menuItem .k{font-weight:900}
+    .menuItem .s{font-size:12px; color:var(--muted)}
+    .modal{
+      position:fixed; inset:0; display:none; z-index:50;
+      background:rgba(0,0,0,.55);
+      padding:16px;
+    }
+    .modal.show{display:flex; align-items:center; justify-content:center}
+    .modalBox{
+      width:min(720px, 98vw);
+      background:linear-gradient(180deg, rgba(11,47,36,.96), rgba(8,48,38,.90));
+      border:1px solid rgba(250,204,21,.18);
+      border-radius:24px;
+      box-shadow: 0 30px 90px rgba(0,0,0,.6);
+      overflow:hidden;
+    }
+    .modalHead{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 14px;
+      border-bottom:1px solid rgba(250,204,21,.12);
+    }
+    .modalHead .t{font-weight:950}
+    .modalBody{padding:14px}
+    .grid{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+    }
+    @media (min-width:720px){
+      .grid.two{grid-template-columns:1fr 1fr}
+    }
+    label{font-size:12px; color:var(--muted); margin:2px 4px 6px; display:block}
+    .sel{
+      width:100%;
+      padding:14px 14px;
+      border-radius:16px;
+      border:1px solid rgba(250,204,21,.18);
+      outline:none;
+      background:rgba(0,0,0,.14);
+      color:var(--text);
+      font-size:16px;
+    }
+    .wheel{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap:10px;
+    }
+    .footRow{display:flex; gap:10px; justify-content:flex-end; margin-top:12px}
+    .fab{
+      position:fixed;
+      right:14px;
+      bottom:14px;
+      z-index:35;
+      display:none;
+      padding:14px 16px;
+      border-radius:999px;
+      border:1px solid rgba(250,204,21,.24);
+      background:linear-gradient(180deg, rgba(250,204,21,.18), rgba(250,204,21,.06));
+      box-shadow: var(--shadow);
+      font-weight:950;
+      cursor:pointer;
+    }
+    .fab.show{display:block}
+    .tabs{
+      display:flex; gap:10px; margin:8px 0 12px;
+      flex-wrap:wrap;
+    }
+    .tab{
+      padding:9px 12px;
+      border-radius:999px;
+      border:1px solid rgba(250,204,21,.18);
+      background:rgba(0,0,0,.10);
+      cursor:pointer;
+      font-weight:900;
+      font-size:12px;
+    }
+    .tab.active{
+      border-color:rgba(250,204,21,.35);
+      background:rgba(250,204,21,.10);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="toprow">
+      <button class="btnIcon" id="btnMenu">☰</button>
+
+      <div class="titlePill">
+        <div style="min-width:0">
+          <div class="small" id="subTitle">Ekran</div>
+          <div class="big" id="mainTitle">Tüm Ürünler</div>
+        </div>
+      </div>
+
+      <button class="btnIcon" id="btnSearch">Ara</button>
+    </div>
+
+    <div class="searchRow" id="searchRow">
+      <input class="inp" id="q" placeholder="Ürün ara..." />
+    </div>
+
+    <div class="selectBanner" id="selectBanner">
+      <div class="bannerLeft">
+        <div class="b1" id="selName">Seçim yok</div>
+        <div class="b2" id="selMeta">—</div>
+      </div>
+      <div class="row" style="gap:8px">
+        <button class="btn" id="btnShareTop">Paylaş</button>
+        <button class="btn" id="btnClearSel">Temizle</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="tabs">
+      <div class="tab active" data-view="all">Tüm Ürünler</div>
+      <div class="tab" data-view="skt10">SKT: Son 10 Gün</div>
+      <div class="tab" data-view="report">Günlük Rapor</div>
+      <div class="tab" data-view="settings">Ayarlar</div>
+    </div>
+
+    <p class="listHint" id="hint">Ürüne dokun → seç/düzenle. Menüden “Ürün/Parti Ekle”.</p>
+
+    <div id="list"></div>
+  </div>
+
+  <button class="fab" id="fabShare">Paylaş</button>
+
+  <!-- Drawer -->
+  <div class="drawer" id="drawer">
+    <div class="drawerPanel">
+      <div class="drawerTitle">Menü</div>
+
+      <div class="menuItem" id="menuAdd">
+        <div>
+          <div class="k">+ Ürün / Parti Ekle</div>
+          <div class="s">Yeni kayıt veya parti ekle</div>
+        </div>
+        <div>›</div>
+      </div>
+
+      <div class="menuItem" id="menuExport">
+        <div>
+          <div class="k">Paylaş (CSV)</div>
+          <div class="s">Seçili / tüm liste</div>
+        </div>
+        <div>›</div>
+      </div>
+
+      <div class="menuItem" id="menuClose">
+        <div>
+          <div class="k">Kapat</div>
+          <div class="s">Menüyü kapat</div>
+        </div>
+        <div>×</div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="h">Kısayol</div>
+        <div class="muted" style="font-size:12px; margin-top:8px">
+          • Ürüne tıkla: seç/düzenle<br/>
+          • Seçince üstte Paylaş çıkar<br/>
+          • Arama: sağ üst “Ara”
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div class="modal" id="modal">
+    <div class="modalBox">
+      <div class="modalHead">
+        <div class="t" id="modalTitle">Ürün / Parti</div>
+        <button class="btnIcon" id="btnCloseModal">Kapat</button>
+      </div>
+      <div class="modalBody">
+        <div class="grid">
+          <div>
+            <label>Mod</label>
+            <select class="sel" id="mode">
+              <option value="new">Yeni ürün + parti</option>
+              <option value="party">Mevcut ürüne parti ekle</option>
+            </select>
+          </div>
+
+          <div class="grid two">
+            <div>
+              <label>Ürün adı</label>
+              <input class="inp" id="name" placeholder="Örn: DANET SUCUK" />
+            </div>
+            <div>
+              <label>Adet</label>
+              <input class="inp" id="qty" inputmode="numeric" placeholder="0" />
+            </div>
+          </div>
+
+          <div class="grid two">
+            <div>
+              <label>SKT (kayan) — Ay: NUMARA</label>
+              <div class="wheel">
+                <select class="sel" id="sktD"></select>
+                <select class="sel" id="sktM"></select>
+                <select class="sel" id="sktY"></select>
+              </div>
+            </div>
+
+            <div>
+              <label>Temin</label>
+              <select class="sel" id="temin">
+                <option value="Sipariş">Sipariş</option>
+                <option value="Dağılım">Dağılım</option>
+                <option value="Direkt">Direkt</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid two">
+            <div>
+              <label>Dağılım nedeni</label>
+              <select class="sel" id="dagitimNedeni">
+                <option value="">—</option>
+                <option value="Inserte hazırlık">Inserte hazırlık</option>
+                <option value="Merkez dağılım">Merkez dağılım</option>
+                <option value="Şube dağılım">Şube dağılım</option>
+              </select>
+            </div>
+
+            <div>
+              <label>Insert adı</label>
+              <input class="inp" id="insertAdi" placeholder="Örn: 14 Şubat" />
+            </div>
+          </div>
+
+          <div>
+            <label>Insert tarihi (kayan) — Ay: İSİM</label>
+            <div class="wheel">
+              <select class="sel" id="insD"></select>
+              <select class="sel" id="insM"></select>
+              <select class="sel" id="insY"></select>
+            </div>
+          </div>
+
+          <div>
+            <label>Not</label>
+            <textarea class="inp" id="note" rows="3" placeholder="Ek bilgi..."></textarea>
+          </div>
+
+          <div class="footRow">
+            <button class="btn danger" id="btnDelete" style="display:none">Sil</button>
+            <button class="btn" id="btnSave">Kaydet</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script src="./app.js"></script>
+</body>
+</html>
