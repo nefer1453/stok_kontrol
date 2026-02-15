@@ -1,6 +1,7 @@
 <resources>
-  <style name="Theme.StokKontrol" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-    <item name="android:statusBarColor">@android:color/transparent</item>
-    <item name="android:navigationBarColor">@android:color/transparent</item>
+  <style name="Theme.StokKontrol" parent="Theme.AppCompat.Light.NoActionBar">
+    <item name="colorPrimary">#2e7d32</item>
+    <item name="colorPrimaryDark">#1b5e20</item>
+    <item name="colorAccent">#2e7d32</item>
   </style>
 </resources>

@@ -2,417 +2,495 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b2f24" />
-  <title>stok_kontrol</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#2e7d32" />
+  <title>Stok Kontrol</title>
   <style>
     :root{
-      --bg:#071a14;
-      --panel:#0b2f24;
-      --panel2:#083026;
-      --line:rgba(250,204,21,.25);
-      --text:#e7f7ef;
-      --muted:rgba(231,247,239,.65);
-      --gold:#facc15;
-      --green:#16a34a;
-      --red:#ef4444;
+      --bg:#ffffff;
+      --fg:#0c1410;
+      --muted:#6b7280;
+      --card:#ffffff;
+      --line:#e5e7eb;
+      --green:#2e7d32;
+      --green2:#1b5e20;
+      --red:#d32f2f;
       --amber:#f59e0b;
-      --shadow:0 10px 30px rgba(0,0,0,.35);
-      --r:18px;
+      --shadow: 0 14px 40px rgba(0,0,0,.08);
+      --radius: 16px;
     }
     *{box-sizing:border-box}
-    html,body{height:100%}
     body{
-      margin:0; background:radial-gradient(1100px 500px at 20% 0%, rgba(250,204,21,.08), transparent 50%),
-                           radial-gradient(900px 600px at 100% 100%, rgba(22,163,74,.12), transparent 55%),
-                           var(--bg);
-      color:var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      overflow-x:hidden;
+      margin:0;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:var(--bg);
+      color:var(--fg);
     }
-    .topbar{
-      position:sticky; top:0; z-index:30;
-      padding:12px 12px 10px;
-      backdrop-filter: blur(10px);
-      background: linear-gradient(to bottom, rgba(7,26,20,.92), rgba(7,26,20,.65));
-      border-bottom:1px solid rgba(250,204,21,.12);
+
+    header{
+      position:sticky; top:0; z-index:20;
+      background:linear-gradient(180deg,#ffffff,#f8fafc);
+      border-bottom:1px solid var(--line);
+      padding:10px 12px;
+      display:flex; align-items:center; gap:10px;
     }
-    .toprow{display:flex; align-items:center; gap:10px}
-    .btnIcon{
+    .iconbtn{
       border:1px solid var(--line);
-      background:linear-gradient(180deg, rgba(11,47,36,.85), rgba(8,48,38,.6));
-      color:var(--text);
+      background:#fff;
+      border-radius:12px;
       padding:10px 12px;
-      border-radius:14px;
-      box-shadow: var(--shadow);
-      cursor:pointer;
-      user-select:none;
-    }
-    .titlePill{
-      flex:1;
-      border:1px solid rgba(250,204,21,.18);
-      border-radius:16px;
-      padding:10px 12px;
-      background:rgba(11,47,36,.55);
-      box-shadow: var(--shadow);
-      min-width:0;
-      display:flex;
-      gap:10px;
-      align-items:center;
-    }
-    .titlePill .small{color:var(--muted); font-size:12px}
-    .titlePill .big{font-weight:800; letter-spacing:.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-    .searchRow{margin-top:10px; display:none}
-    .searchRow.show{display:block}
-    .inp{
-      width:100%;
-      padding:14px 14px;
-      border-radius:16px;
-      border:1px solid rgba(250,204,21,.18);
-      outline:none;
-      background:rgba(11,47,36,.55);
-      color:var(--text);
-      font-size:16px;
-    }
-    .main{padding:14px 12px 96px}
-    .card{
-      background:linear-gradient(180deg, rgba(11,47,36,.85), rgba(8,48,38,.62));
-      border:1px solid rgba(250,204,21,.16);
-      border-radius:22px;
-      box-shadow: var(--shadow);
-      padding:14px;
-      margin-bottom:12px;
-    }
-    .row{display:flex; gap:10px; align-items:center}
-    .space{justify-content:space-between}
-    .h{font-weight:900; letter-spacing:.2px}
-    .pill{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:7px 10px;
-      border-radius:999px;
-      border:1px solid rgba(250,204,21,.25);
-      background:rgba(0,0,0,.12);
-      color:var(--text);
-      font-size:12px;
-      white-space:nowrap;
-    }
-    .pill.badge{font-weight:800}
-    .pill.crit{border-color:rgba(239,68,68,.35); background:rgba(239,68,68,.14)}
-    .pill.warn{border-color:rgba(245,158,11,.35); background:rgba(245,158,11,.14)}
-    .pill.ok{border-color:rgba(22,163,74,.35); background:rgba(22,163,74,.14)}
-    .muted{color:var(--muted)}
-    .btn{
-      padding:12px 14px;
-      border-radius:16px;
-      border:1px solid rgba(250,204,21,.22);
-      background:linear-gradient(180deg, rgba(250,204,21,.16), rgba(250,204,21,.06));
-      color:var(--text);
       font-weight:900;
-      cursor:pointer;
-      box-shadow: var(--shadow);
+      box-shadow:0 6px 20px rgba(0,0,0,.06);
     }
-    .btn.danger{
-      border-color:rgba(239,68,68,.35);
-      background:linear-gradient(180deg, rgba(239,68,68,.18), rgba(239,68,68,.07));
+    .title{
+      font-weight:900;
+      color:var(--green2);
+      letter-spacing:.2px;
     }
-    .listHint{font-size:12px; color:var(--muted); margin:0 2px 10px}
-    .selectBanner{
-      margin-top:10px;
-      display:none;
-      border:1px solid rgba(250,204,21,.22);
-      border-radius:18px;
-      padding:10px 12px;
-      background:rgba(11,47,36,.55);
-      box-shadow: var(--shadow);
-      gap:10px;
-      align-items:center;
-      justify-content:space-between;
+    .spacer{flex:1}
+    #searchBtn{
+      border:1px solid rgba(46,125,50,.35);
+      background:rgba(46,125,50,.07);
+      color:var(--green2);
     }
-    .selectBanner.show{display:flex}
-    .bannerLeft{min-width:0}
-    .bannerLeft .b1{font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-    .bannerLeft .b2{font-size:12px; color:var(--muted)}
-    .drawer{
-      position:fixed; inset:0;
-      display:none; z-index:40;
-      background:rgba(0,0,0,.45);
+
+    main{padding:12px 12px 90px}
+
+    .pillbar{
+      display:flex; gap:8px; flex-wrap:wrap;
+      margin:10px 0;
     }
-    .drawer.show{display:block}
-    .drawerPanel{
-      position:absolute; left:0; top:0; bottom:0;
-      width:min(320px, 88vw);
-      background:linear-gradient(180deg, rgba(11,47,36,.96), rgba(8,48,38,.90));
-      border-right:1px solid rgba(250,204,21,.14);
-      box-shadow: 20px 0 50px rgba(0,0,0,.4);
-      padding:14px;
+    .pill{
+      border:1px solid var(--line);
+      background:#fff;
+      border-radius:999px;
+      padding:8px 10px;
+      font-weight:800;
+      color:#14532d;
     }
-    .drawerTitle{font-weight:950; margin:6px 2px 10px}
-    .menuItem{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:12px 12px;
-      border-radius:16px;
-      border:1px solid rgba(250,204,21,.14);
-      background:rgba(0,0,0,.10);
-      margin-bottom:10px;
-      cursor:pointer;
+
+    .sectionTitle{
+      font-size:14px;
+      color:var(--muted);
+      margin:14px 4px 8px;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.06em;
     }
-    .menuItem .k{font-weight:900}
-    .menuItem .s{font-size:12px; color:var(--muted)}
-    .modal{
-      position:fixed; inset:0; display:none; z-index:50;
-      background:rgba(0,0,0,.55);
-      padding:16px;
-    }
-    .modal.show{display:flex; align-items:center; justify-content:center}
-    .modalBox{
-      width:min(720px, 98vw);
-      background:linear-gradient(180deg, rgba(11,47,36,.96), rgba(8,48,38,.90));
-      border:1px solid rgba(250,204,21,.18);
-      border-radius:24px;
-      box-shadow: 0 30px 90px rgba(0,0,0,.6);
-      overflow:hidden;
-    }
-    .modalHead{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:14px 14px;
-      border-bottom:1px solid rgba(250,204,21,.12);
-    }
-    .modalHead .t{font-weight:950}
-    .modalBody{padding:14px}
+
     .grid{
       display:grid;
-      grid-template-columns:1fr;
+      grid-template-columns: 1fr;
       gap:10px;
     }
-    @media (min-width:720px){
-      .grid.two{grid-template-columns:1fr 1fr}
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:12px;
+      box-shadow:0 10px 26px rgba(0,0,0,.06);
     }
-    label{font-size:12px; color:var(--muted); margin:2px 4px 6px; display:block}
-    .sel{
-      width:100%;
-      padding:14px 14px;
-      border-radius:16px;
-      border:1px solid rgba(250,204,21,.18);
-      outline:none;
-      background:rgba(0,0,0,.14);
-      color:var(--text);
-      font-size:16px;
-    }
-    .wheel{
-      display:grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap:10px;
-    }
-    .footRow{display:flex; gap:10px; justify-content:flex-end; margin-top:12px}
-    .fab{
-      position:fixed;
-      right:14px;
-      bottom:14px;
-      z-index:35;
-      display:none;
-      padding:14px 16px;
-      border-radius:999px;
-      border:1px solid rgba(250,204,21,.24);
-      background:linear-gradient(180deg, rgba(250,204,21,.18), rgba(250,204,21,.06));
-      box-shadow: var(--shadow);
+    .row{display:flex; gap:10px; align-items:center}
+    .grow{flex:1}
+    .name{font-weight:950}
+    .meta{color:var(--muted); font-weight:800; font-size:13px; margin-top:2px}
+    .badge{
       font-weight:950;
-      cursor:pointer;
-    }
-    .fab.show{display:block}
-    .tabs{
-      display:flex; gap:10px; margin:8px 0 12px;
-      flex-wrap:wrap;
-    }
-    .tab{
-      padding:9px 12px;
+      padding:6px 10px;
       border-radius:999px;
-      border:1px solid rgba(250,204,21,.18);
-      background:rgba(0,0,0,.10);
-      cursor:pointer;
-      font-weight:900;
+      border:1px solid var(--line);
+      background:#fff;
+      color:#111827;
       font-size:12px;
     }
-    .tab.active{
-      border-color:rgba(250,204,21,.35);
-      background:rgba(250,204,21,.10);
+    .badge.red{border-color:rgba(211,47,47,.35); background:rgba(211,47,47,.06); color:#7f1d1d}
+    .badge.green{border-color:rgba(46,125,50,.35); background:rgba(46,125,50,.06); color:#14532d}
+    .badge.amber{border-color:rgba(245,158,11,.35); background:rgba(245,158,11,.08); color:#7c2d12}
+
+    /* Blink (2sn periyot) */
+    @keyframes blink2 { 0%,49%{opacity:1} 50%,100%{opacity:.25} }
+    .blink-red { border-color:rgba(211,47,47,.5) !important; animation:blink2 2s infinite; }
+    .blink-green { border-color:rgba(46,125,50,.5) !important; animation:blink2 2s infinite; }
+
+    /* Drawer */
+    #drawerBack{
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.35);
+      opacity:0; pointer-events:none;
+      transition:.15s; z-index:50;
+    }
+    #drawerBack.show{opacity:1; pointer-events:auto}
+    #drawer{
+      position:fixed; left:0; top:0; bottom:0;
+      width:min(86vw,320px);
+      background:#fff;
+      transform:translateX(-105%);
+      transition:.18s;
+      z-index:60;
+      border-right:1px solid var(--line);
+      box-shadow:var(--shadow);
+      padding:12px;
+    }
+    #drawer.show{transform:translateX(0)}
+    .navbtn{
+      width:100%;
+      text-align:left;
+      padding:12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:#fff;
+      font-weight:900;
+      margin-bottom:10px;
+    }
+    .navbtn.primary{
+      border-color:rgba(46,125,50,.35);
+      background:rgba(46,125,50,.06);
+      color:var(--green2);
+    }
+
+    /* Modal */
+    #modalBack{
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.42);
+      opacity:0; pointer-events:none;
+      transition:.15s;
+      z-index:80;
+    }
+    #modalBack.show{opacity:1; pointer-events:auto}
+    .modal{
+      position:fixed; left:50%; top:50%;
+      transform:translate(-50%,-50%);
+      width:min(94vw,520px);
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:18px;
+      box-shadow:0 18px 60px rgba(0,0,0,.25);
+      display:none;
+      z-index:90;
+      overflow:hidden;
+    }
+    .modal.show{display:block}
+    .mhead{
+      padding:12px 14px;
+      border-bottom:1px solid var(--line);
+      display:flex; gap:10px; align-items:center;
+      background:linear-gradient(180deg,#fff,#f8fafc);
+    }
+    .mhead .mtitle{font-weight:950; color:var(--green2)}
+    .mbody{padding:12px 14px}
+    .actions{display:flex; gap:10px; justify-content:flex-end; padding:12px 14px; border-top:1px solid var(--line); background:#fff}
+    .btn{
+      border:1px solid var(--line);
+      background:#fff;
+      border-radius:14px;
+      padding:10px 12px;
+      font-weight:950;
+    }
+    .btn.primary{
+      border-color:rgba(46,125,50,.35);
+      background:rgba(46,125,50,.08);
+      color:var(--green2);
+    }
+    .btn.danger{
+      border-color:rgba(211,47,47,.35);
+      background:rgba(211,47,47,.08);
+      color:#7f1d1d;
+    }
+
+    .field{margin:10px 0}
+    label{display:block; font-size:12px; color:var(--muted); font-weight:900; margin:0 0 6px 2px}
+    input,select,textarea{
+      width:100%;
+      padding:12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      font-weight:800;
+      outline:none;
+      background:#fff;
+    }
+    textarea{resize:vertical}
+
+    /* Share FAB */
+    #shareFab{
+      position:fixed; right:16px; bottom:16px;
+      z-index:120;
+      border-radius:18px;
+      border:2px solid rgba(46,125,50,.35);
+      background:rgba(46,125,50,.12);
+      color:var(--green2);
+      padding:12px 14px;
+      font-weight:950;
+      box-shadow:0 16px 46px rgba(0,0,0,.18);
+    }
+
+    /* Search modal quick */
+    #searchBox{display:none}
+    #searchBox.show{display:block}
+
+    /* Date Wheel (Sheet) */
+    #dwBack{
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.55);
+      opacity:0; pointer-events:none;
+      transition:.15s;
+      z-index:200;
+    }
+    #dwBack.show{opacity:1; pointer-events:auto}
+    #dwSheet{
+      position:fixed; left:50%; bottom:-420px;
+      transform:translateX(-50%);
+      width:min(96vw,520px);
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:18px 18px 0 0;
+      box-shadow:0 -18px 60px rgba(0,0,0,.25);
+      transition:.18s;
+      z-index:210;
+      overflow:hidden;
+    }
+    #dwSheet.show{bottom:0}
+    #dwHead{
+      padding:12px 14px;
+      border-bottom:1px solid var(--line);
+      display:flex; align-items:center; gap:10px;
+      background:linear-gradient(180deg,#fff,#f8fafc);
+    }
+    #dwTitle{font-weight:950; color:var(--green2)}
+    #dwBody{
+      display:flex; gap:10px;
+      padding:14px;
+    }
+    .dwCol{flex:1}
+    .dwCol select{
+      height:210px;
+      font-size:18px;
+      font-weight:950;
+      text-align:center;
+      border-radius:16px;
+      padding:8px;
+    }
+    #dwActions{
+      display:flex; gap:10px; justify-content:flex-end;
+      padding:12px 14px;
+      border-top:1px solid var(--line);
+      background:#fff;
     }
   </style>
 </head>
 <body>
 
-  <div class="topbar">
-    <div class="toprow">
-      <button class="btnIcon" id="btnMenu">☰</button>
+<header>
+  <button id="menuBtn" class="iconbtn" title="Menü">≡</button>
+  <div class="title">Stok Kontrol</div>
+  <div class="spacer"></div>
+  <button id="searchBtn" class="iconbtn" title="Ara">Ara</button>
+</header>
 
-      <div class="titlePill">
-        <div style="min-width:0">
-          <div class="small" id="subTitle">Ekran</div>
-          <div class="big" id="mainTitle">Tüm Ürünler</div>
-        </div>
-      </div>
-
-      <button class="btnIcon" id="btnSearch">Ara</button>
-    </div>
-
-    <div class="searchRow" id="searchRow">
-      <input class="inp" id="q" placeholder="Ürün ara..." />
-    </div>
-
-    <div class="selectBanner" id="selectBanner">
-      <div class="bannerLeft">
-        <div class="b1" id="selName">Seçim yok</div>
-        <div class="b2" id="selMeta">—</div>
-      </div>
-      <div class="row" style="gap:8px">
-        <button class="btn" id="btnShareTop">Paylaş</button>
-        <button class="btn" id="btnClearSel">Temizle</button>
-      </div>
-    </div>
+<main>
+  <div class="pillbar">
+    <div class="pill" id="statPill">Toplam: 0</div>
+    <div class="pill" id="todayPill">Bugün kaldırılan: 0</div>
   </div>
 
-  <div class="main">
-    <div class="tabs">
-      <div class="tab active" data-view="all">Tüm Ürünler</div>
-      <div class="tab" data-view="skt10">SKT: Son 10 Gün</div>
-      <div class="tab" data-view="report">Günlük Rapor</div>
-      <div class="tab" data-view="settings">Ayarlar</div>
+  <div class="sectionTitle">Ana Uyarılar</div>
+  <div class="grid" id="homeAlerts"></div>
+
+  <div class="sectionTitle" id="listTitle">Tüm Ürünler</div>
+  <div class="grid" id="allList"></div>
+</main>
+
+<button id="shareFab">Paylaş ↗</button>
+
+<div id="drawerBack"></div>
+<aside id="drawer">
+  <button class="navbtn primary" id="navAdd">+ Ürün / Parti Ekle</button>
+  <button class="navbtn" id="navHome">Ana Liste</button>
+  <button class="navbtn" id="navRemoved">Kaldırılanlar</button>
+  <button class="navbtn" id="navBackup">Yedek</button>
+  <button class="navbtn" id="navRestore">Geri Yükle</button>
+</aside>
+
+<div id="modalBack"></div>
+
+<!-- Add/Edit Modal -->
+<section class="modal" id="modalAdd">
+  <div class="mhead">
+    <div class="mtitle" id="addTitle">Ürün / Parti</div>
+    <div class="spacer"></div>
+    <button class="btn" id="closeAdd">Kapat</button>
+  </div>
+  <div class="mbody">
+    <div class="field">
+      <label>İsim</label>
+      <input id="pName" placeholder="Örn: Aytaç sosis" />
     </div>
 
-    <p class="listHint" id="hint">Ürüne dokun → seç/düzenle. Menüden “Ürün/Parti Ekle”.</p>
+    <div class="field">
+      <label>Adet</label>
+      <input id="qty" inputmode="numeric" placeholder="Örn: 15" />
+    </div>
 
-    <div id="list"></div>
-  </div>
+    <div class="field">
+      <label>SKT (Kaydet deyince wheel açılır)</label>
+      <!-- görünür input yok: sadece value tutmak için -->
+      <input id="skt" type="hidden" />
+      <div class="meta" id="sktPreview">SKT: seçilmedi</div>
+    </div>
 
-  <button class="fab" id="fabShare">Paylaş</button>
+    <div class="field">
+      <label>Temin</label>
+      <select id="supply">
+        <option value="siparis">Sipariş</option>
+        <option value="dagi">Dağılım</option>
+        <option value="merkez">Merkez Dağılım</option>
+      </select>
+    </div>
 
-  <!-- Drawer -->
-  <div class="drawer" id="drawer">
-    <div class="drawerPanel">
-      <div class="drawerTitle">Menü</div>
-
-      <div class="menuItem" id="menuAdd">
-        <div>
-          <div class="k">+ Ürün / Parti Ekle</div>
-          <div class="s">Yeni kayıt veya parti ekle</div>
-        </div>
-        <div>›</div>
+    <div id="supplySiparis" style="display:none">
+      <div class="field">
+        <label>Sipariş veren</label>
+        <input id="siparisVeren" placeholder="İsim" />
       </div>
-
-      <div class="menuItem" id="menuExport">
-        <div>
-          <div class="k">Paylaş (CSV)</div>
-          <div class="s">Seçili / tüm liste</div>
-        </div>
-        <div>›</div>
-      </div>
-
-      <div class="menuItem" id="menuClose">
-        <div>
-          <div class="k">Kapat</div>
-          <div class="s">Menüyü kapat</div>
-        </div>
-        <div>×</div>
-      </div>
-
-      <div class="card" style="margin-top:14px">
-        <div class="h">Kısayol</div>
-        <div class="muted" style="font-size:12px; margin-top:8px">
-          • Ürüne tıkla: seç/düzenle<br/>
-          • Seçince üstte Paylaş çıkar<br/>
-          • Arama: sağ üst “Ara”
-        </div>
+      <div class="field">
+        <label>Sipariş alan</label>
+        <input id="siparisAlan" placeholder="İsim" />
       </div>
     </div>
-  </div>
 
-  <!-- Add/Edit Modal -->
-  <div class="modal" id="modal">
-    <div class="modalBox">
-      <div class="modalHead">
-        <div class="t" id="modalTitle">Ürün / Parti</div>
-        <button class="btnIcon" id="btnCloseModal">Kapat</button>
+    <div id="supplyDagi" style="display:none">
+      <div class="field">
+        <label>Neden</label>
+        <select id="dagiNeden">
+          <option value="iskonto">İskonto</option>
+          <option value="inserte_hazirlik">İnserte hazırlık</option>
+          <option value="diger">Diğer</option>
+        </select>
       </div>
-      <div class="modalBody">
-        <div class="grid">
-          <div>
-            <label>Mod</label>
-            <select class="sel" id="mode">
-              <option value="new">Yeni ürün + parti</option>
-              <option value="party">Mevcut ürüne parti ekle</option>
-            </select>
-          </div>
 
-          <div class="grid two">
-            <div>
-              <label>Ürün adı</label>
-              <input class="inp" id="name" placeholder="Örn: DANET SUCUK" />
-            </div>
-            <div>
-              <label>Adet</label>
-              <input class="inp" id="qty" inputmode="numeric" placeholder="0" />
-            </div>
-          </div>
+      <div class="field" id="insertNameWrap" style="display:none">
+        <label>Insert adı</label>
+        <input id="insertAdi" placeholder="Örn: Şubat Insert" />
+      </div>
 
-          <div class="grid two">
-            <div>
-              <label>SKT (kayan) — Ay: NUMARA</label>
-              <div class="wheel">
-                <select class="sel" id="sktD"></select>
-                <select class="sel" id="sktM"></select>
-                <select class="sel" id="sktY"></select>
-              </div>
-            </div>
-
-            <div>
-              <label>Temin</label>
-              <select class="sel" id="temin">
-                <option value="Sipariş">Sipariş</option>
-                <option value="Dağılım">Dağılım</option>
-                <option value="Direkt">Direkt</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="grid two">
-            <div>
-              <label>Dağılım nedeni</label>
-              <select class="sel" id="dagitimNedeni">
-                <option value="">—</option>
-                <option value="Inserte hazırlık">Inserte hazırlık</option>
-                <option value="Merkez dağılım">Merkez dağılım</option>
-                <option value="Şube dağılım">Şube dağılım</option>
-              </select>
-            </div>
-
-            <div>
-              <label>Insert adı</label>
-              <input class="inp" id="insertAdi" placeholder="Örn: 14 Şubat" />
-            </div>
-          </div>
-
-          <div>
-            <label>Insert tarihi (kayan) — Ay: İSİM</label>
-            <div class="wheel">
-              <select class="sel" id="insD"></select>
-              <select class="sel" id="insM"></select>
-              <select class="sel" id="insY"></select>
-            </div>
-          </div>
-
-          <div>
-            <label>Not</label>
-            <textarea class="inp" id="note" rows="3" placeholder="Ek bilgi..."></textarea>
-          </div>
-
-          <div class="footRow">
-            <button class="btn danger" id="btnDelete" style="display:none">Sil</button>
-            <button class="btn" id="btnSave">Kaydet</button>
-          </div>
+      <div class="field" id="insertDateWrap" style="display:none">
+        <label>Insert tarihi (ister wheel ister takvim)</label>
+        <div class="row">
+          <select id="insertDateMode" style="max-width:170px">
+            <option value="wheel">Kayar</option>
+            <option value="calendar">Takvim</option>
+          </select>
+          <div class="grow"></div>
         </div>
+        <input id="insertTarihiWheel" type="hidden" />
+        <input id="insertTarihiCal" type="date" style="display:none" />
+        <div class="meta" id="insertPreview">Insert: seçilmedi</div>
       </div>
     </div>
-  </div>
 
-<script src="./app.js"></script>
+    <div class="field">
+      <label>Not</label>
+      <textarea id="note" rows="2" placeholder="Ek bilgi..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Uyarı Ayarı (gün)</label>
+      <div class="row">
+        <div class="grow">
+          <label style="margin-top:0">Kırmızı (SKT'ye kaç gün kala)</label>
+          <input id="warnRedDays" inputmode="numeric" placeholder="Örn: 5" />
+        </div>
+        <div class="grow">
+          <label style="margin-top:0">Fiyat iste (kaç gün kala)</label>
+          <input id="priceAskDays" inputmode="numeric" placeholder="Örn: 30" />
+        </div>
+      </div>
+      <div class="meta">SKT geçmiş/gelmiş: kırmızı blink. Fiyat zamanı: yeşil blink.</div>
+    </div>
+
+  </div>
+  <div class="actions">
+    <button class="btn primary" id="saveAdd">Kaydet</button>
+  </div>
+</section>
+
+<!-- Action Sheet (Edit/Remove) -->
+<section class="modal" id="modalAct">
+  <div class="mhead">
+    <div class="mtitle" id="actTitle">Ürün</div>
+    <div class="spacer"></div>
+    <button class="btn" id="closeAct">Kapat</button>
+  </div>
+  <div class="mbody">
+    <div class="meta" id="actMeta"></div>
+  </div>
+  <div class="actions">
+    <button class="btn" id="actEdit">Düzenle</button>
+    <button class="btn danger" id="actRemove">Kaldır</button>
+  </div>
+</section>
+
+<!-- Remove Modal -->
+<section class="modal" id="modalRem">
+  <div class="mhead">
+    <div class="mtitle">Kaldır</div>
+    <div class="spacer"></div>
+    <button class="btn" id="closeRem">Kapat</button>
+  </div>
+  <div class="mbody">
+    <div class="field">
+      <label>Neden</label>
+      <select id="remReason">
+        <option value="skt">SKT</option>
+        <option value="fabrika">Fabrika kaynaklı</option>
+        <option value="kirik">Kırık / zarar gördü</option>
+        <option value="diger">Diğer</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Not</label>
+      <input id="remNote" placeholder="Örn: koli ezilmiş..." />
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn primary" id="confirmRem">Onayla</button>
+  </div>
+</section>
+
+<!-- Search Modal -->
+<section class="modal" id="modalSearch">
+  <div class="mhead">
+    <div class="mtitle">Ara</div>
+    <div class="spacer"></div>
+    <button class="btn" id="closeSearch">Kapat</button>
+  </div>
+  <div class="mbody">
+    <div class="field">
+      <label>Ürün ara</label>
+      <input id="q" placeholder="Yaz ve liste filtrelensin..." />
+    </div>
+    <div class="meta">Arama, Tüm Ürünler listesini filtreler.</div>
+  </div>
+</section>
+
+<!-- Date Wheel Sheet -->
+<div id="dwBack"></div>
+<div id="dwSheet" role="dialog" aria-modal="true">
+  <div id="dwHead">
+    <div id="dwTitle">Tarih</div>
+    <div class="spacer"></div>
+    <button id="dwClose" class="btn" type="button">Kapat</button>
+  </div>
+  <div id="dwBody">
+    <div class="dwCol"><select id="dwDay"></select></div>
+    <div class="dwCol"><select id="dwMonth"></select></div>
+    <div class="dwCol"><select id="dwYear"></select></div>
+  </div>
+  <div id="dwActions">
+    <button id="dwToday" class="btn" type="button">Bugün</button>
+    <button id="dwOk" class="btn primary" type="button">Tamam</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>

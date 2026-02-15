@@ -1,1 +1,1 @@
-# WebView app, keep it simple.
+# boş
