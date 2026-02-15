@@ -1,657 +1,405 @@
-/* stok_kontrol - offline (localStorage)
-   FIX A: Modal açıkken Paylaş FAB gizlenir + modal scroll/padding ile Kaydet kapanmaz.
-*/
-(() => {
-  const $ = (id) => document.getElementById(id);
+(function(){
+  "use strict";
+  const $ = (id)=>document.getElementById(id);
+  const LS_KEY = "stok_kontrol_state_v3";
 
-  // Elements
-  const screenTitle = $('screenTitle');
-  const listEl = $('list');
-  const chipsEl = $('chips');
-
-  const btnMenu = $('btnMenu');
-  const drawer = $('drawer');
-  const drawerBackdrop = $('drawerBackdrop');
-  const btnDrawerClose = $('btnDrawerClose');
-  const btnAddFromMenu = $('btnAddFromMenu');
-
-  const btnSearch = $('btnSearch');
-  const searchWrap = $('searchWrap');
-  const q = $('q');
-  const btnClear = $('btnClear');
-
-  const shareFab = $('shareFab');
-  const shareHint = $('shareHint');
-
-  const modalBackdrop = $('modalBackdrop');
-  const modal = $('modal');
-  const modalTitle = $('modalTitle');
-  const btnModalClose = $('btnModalClose');
-
-  const mode = $('mode');
-  const nameInp = $('name');
-  const qtyInp = $('qty');
-  const teminSel = $('temin');
-  const distReasonSel = $('distReason');
-  const insertNameInp = $('insertName');
-  const price30Sel = $('price30');
-  const noteInp = $('note');
-
-  const wSkt = $('w_skt');
-  const wInsert = $('w_insert');
-
-  const btnSave = $('btnSave');
-  const btnDelete = $('btnDelete');
-
-  const toast = $('toast');
-
-  // State
-  let state = {
-    view: 'dashboard',   // dashboard | all | skt10 | removed
-    searchOn: false,
-    query: '',
-    editingId: null
+  const pad2 = (n)=>String(n).padStart(2,"0");
+  const iso = (y,m,d)=>`${y}-${pad2(m)}-${pad2(d)}`;
+  const parseISO = (s)=>{
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||""));
+    if(!m) return null;
+    return {y:+m[1], mo:+m[2], d:+m[3]};
   };
-
-  const STORE_KEY = 'stok_kontrol_v2_items';
-  const REMOVED_KEY = 'stok_kontrol_v2_removed';
-
-  const today = () => {
-    const d = new Date();
-    d.setHours(0,0,0,0);
-    return d;
+  const today = ()=>{
+    const t=new Date(); t.setHours(0,0,0,0);
+    return t;
   };
-
-  const toYMD = (d) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,'0');
-    const day = String(d.getDate()).padStart(2,'0');
-    return `${y}-${m}-${day}`;
+  const daysUntil = (isoDate)=>{
+    const p=parseISO(isoDate);
+    if(!p) return 99999;
+    const a=new Date(p.y, p.mo-1, p.d); a.setHours(0,0,0,0);
+    return Math.round((a - today())/86400000);
   };
+  const esc = (s)=>String(s||"").replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 
-  const fromYMD = (s) => {
-    const [y,m,d] = s.split('-').map(n => parseInt(n,10));
-    const dt = new Date(y, (m-1), d);
-    dt.setHours(0,0,0,0);
-    return dt;
-  };
-
-  const fmtTR = (ymd) => {
-    const d = fromYMD(ymd);
-    const dd = String(d.getDate()).padStart(2,'0');
-    const mm = String(d.getMonth()+1).padStart(2,'0');
-    const yy = d.getFullYear();
-    return `${dd}.${mm}.${yy}`;
-  };
-
-  const diffDays = (a, b) => {
-    // a-b in days
-    const ms = 24*60*60*1000;
-    return Math.round((a.getTime()-b.getTime())/ms);
-  };
-
-  const load = (key, fallback) => {
+  function load(){
     try{
-      const raw = localStorage.getItem(key);
-      if(!raw) return fallback;
-      return JSON.parse(raw);
-    }catch(_){ return fallback; }
-  };
-
-  const save = (key, val) => localStorage.setItem(key, JSON.stringify(val));
-
-  const getItems = () => load(STORE_KEY, []);
-  const setItems = (items) => save(STORE_KEY, items);
-
-  const getRemoved = () => load(REMOVED_KEY, []);
-  const setRemoved = (items) => save(REMOVED_KEY, items);
-
-  const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
-
-  function showToast(msg){
-    toast.textContent = msg;
-    toast.style.display = 'block';
-    clearTimeout(showToast._t);
-    showToast._t = setTimeout(()=> toast.style.display='none', 1800);
+      const raw=localStorage.getItem(LS_KEY);
+      if(!raw) return { products: [] };
+      const st=JSON.parse(raw);
+      if(!st || !Array.isArray(st.products)) return { products: [] };
+      return st;
+    }catch(_){ return { products: [] }; }
   }
+  function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 
-  // Wheel builders
-  function buildWheel(container, { monthNumeric=false }){
-    container.innerHTML = '';
-    const daySel = document.createElement('select');
-    const monSel = document.createElement('select');
-    const yearSel = document.createElement('select');
-
-    daySel.setAttribute('aria-label','Gün');
-    monSel.setAttribute('aria-label','Ay');
-    yearSel.setAttribute('aria-label','Yıl');
-
-    for(let d=1; d<=31; d++){
-      const o=document.createElement('option');
-      o.value=String(d).padStart(2,'0');
-      o.textContent=String(d).padStart(2,'0');
-      daySel.appendChild(o);
-    }
-
-    if(monthNumeric){
-      for(let m=1; m<=12; m++){
-        const o=document.createElement('option');
-        o.value=String(m).padStart(2,'0');
-        o.textContent=String(m).padStart(2,'0'); // SKT: numara
-        monSel.appendChild(o);
-      }
-    } else {
-      const monthsTR = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
-      for(let m=1; m<=12; m++){
-        const o=document.createElement('option');
-        o.value=String(m).padStart(2,'0');
-        o.textContent=monthsTR[m-1]; // Insert/Temin: isim olabilir
-        monSel.appendChild(o);
-      }
-    }
-
-    const nowY = new Date().getFullYear();
-    for(let y=nowY-1; y<=nowY+15; y++){
-      const o=document.createElement('option');
-      o.value=String(y);
-      o.textContent=String(y);
-      yearSel.appendChild(o);
-    }
-
-    container.appendChild(daySel);
-    container.appendChild(monSel);
-    container.appendChild(yearSel);
-
-    function setFromYMD(ymd){
-      const [yy,mm,dd] = ymd.split('-');
-      daySel.value = dd;
-      monSel.value = mm;
-      yearSel.value = yy;
-    }
-    function getYMD(){
-      const yy = yearSel.value;
-      const mm = monSel.value;
-      const dd = daySel.value;
-      return `${yy}-${mm}-${dd}`;
-    }
-
-    // Default today
-    setFromYMD(toYMD(today()));
-
-    return { setFromYMD, getYMD, daySel, monSel, yearSel };
-  }
-
-  const wheelSKT = buildWheel(wSkt, { monthNumeric:true });
-  const wheelINS = buildWheel(wInsert, { monthNumeric:false });
+  let state = load();
+  let selectedId = null;
+  let editId = null;
+  let currentShareMode = "all"; // all | critical | price
 
   // Drawer
-  function openDrawer(){
-    drawer.classList.add('open');
-    drawerBackdrop.classList.add('open');
+  function openDrawer(){ $("drawerBack").classList.add("show"); $("drawer").classList.add("show"); }
+  function closeDrawer(){ $("drawerBack").classList.remove("show"); $("drawer").classList.remove("show"); }
+
+  // Modal helpers
+  function anyModalOpen(){
+    return ["modalAdd","modalActions","modalRemove"].some(id=>$(id).classList.contains("show"));
   }
-  function closeDrawer(){
-    drawer.classList.remove('open');
-    drawerBackdrop.classList.remove('open');
+  function openModal(id){
+    $("modalBack").classList.add("show");
+    $(id).classList.add("show");
+    $("shareFab").style.display = "none"; // Kaydetin üstüne binmesin
   }
-
-  // Modal (FIX A here)
-  function openModal(editId=null){
-    state.editingId = editId;
-
-    document.body.classList.add('modal-open'); // <<< FIX A
-    modalBackdrop.style.display = 'block';
-    modal.style.display = 'block';
-
-    if(editId){
-      modalTitle.textContent = 'Düzenle';
-      btnDelete.style.display = 'inline-flex';
-      fillFormForEdit(editId);
-    } else {
-      modalTitle.textContent = 'Ürün / Parti Ekle';
-      btnDelete.style.display = 'none';
-      clearForm();
+  function closeModal(id){
+    $(id).classList.remove("show");
+    if(!anyModalOpen()){
+      $("modalBack").classList.remove("show");
+      $("shareFab").style.display = "";
     }
-
-    // focus
-    setTimeout(()=> nameInp.focus(), 50);
+  }
+  function closeAllModals(){
+    ["modalAdd","modalActions","modalRemove"].forEach(id=>$(id).classList.remove("show"));
+    $("modalBack").classList.remove("show");
+    $("shareFab").style.display = "";
   }
 
-  function closeModal(){
-    document.body.classList.remove('modal-open'); // <<< FIX A
-    modalBackdrop.style.display = 'none';
-    modal.style.display = 'none';
-    state.editingId = null;
+  // Wheel
+  function ensureWheel(){
+    const day=$("dwDay"), mo=$("dwMonth"), yr=$("dwYear");
+    if(day.options.length===0) for(let i=1;i<=31;i++) day.add(new Option(String(i), String(i)));
+    if(mo.options.length===0) for(let i=1;i<=12;i++) mo.add(new Option(String(i), String(i))); // AY NUMARA
+    if(yr.options.length===0){
+      const t=new Date().getFullYear();
+      for(let y=t-1;y<=t+6;y++) yr.add(new Option(String(y), String(y)));
+    }
+  }
+  function showWheel(currentIso){
+    ensureWheel();
+    const p=parseISO(currentIso);
+    const t=new Date();
+    $("dwDay").value = String(p?.d ?? t.getDate());
+    $("dwMonth").value = String(p?.mo ?? (t.getMonth()+1));
+    $("dwYear").value = String(p?.y ?? t.getFullYear());
+    $("dwBack").classList.add("show");
+    $("dwSheet").classList.add("show");
+  }
+  function hideWheel(){
+    $("dwBack").classList.remove("show");
+    $("dwSheet").classList.remove("show");
+  }
+  function wheelValue(){
+    const y=+$("dwYear").value, m=+$("dwMonth").value, d=+$("dwDay").value;
+    return iso(y,m,d);
   }
 
-  function clearForm(){
-    mode.value = 'new';
-    nameInp.value = '';
-    qtyInp.value = '';
-    teminSel.value = 'Sipariş';
-    distReasonSel.value = 'Inserte hazırlık';
-    insertNameInp.value = '';
-    price30Sel.value = '0';
-    noteInp.value = '';
-    wheelSKT.setFromYMD(toYMD(today()));
-    wheelINS.setFromYMD(toYMD(today()));
+  // UI
+  function toast(msg){
+    const old=document.title;
+    document.title=msg;
+    setTimeout(()=>{ document.title=old; }, 800);
   }
 
-  function fillFormForEdit(id){
-    const items = getItems();
-    const it = items.find(x=>x.id===id);
-    if(!it) return;
-
-    mode.value = 'new';
-    nameInp.value = it.name || '';
-    qtyInp.value = String(it.qty ?? '');
-    teminSel.value = it.temin || 'Sipariş';
-    distReasonSel.value = it.distReason || 'Inserte hazırlık';
-    insertNameInp.value = it.insertName || '';
-    price30Sel.value = it.price30 ? '1' : '0';
-    noteInp.value = it.note || '';
-
-    wheelSKT.setFromYMD(it.skt || toYMD(today()));
-    wheelINS.setFromYMD(it.insertDate || toYMD(today()));
+  function refreshSupplyUI(){
+    const v=$("supply").value;
+    $("siparisWrap").style.display = (v==="siparis") ? "block" : "none";
+    $("dagiWrap").style.display = (v==="dagi") ? "block" : "none";
+    const dn=$("dagiNeden").value;
+    const showInsert=(v==="dagi" && dn==="inserte_hazirlik");
+    $("insertNameWrap").style.display = showInsert ? "block" : "none";
+    $("insertDateWrap").style.display = showInsert ? "block" : "none";
   }
 
-  // Views / filters
-  function setView(v){
-    state.view = v;
-    state.query = '';
-    q.value = '';
+  function fillForm(p){
+    $("pName").value = p?.name || "";
+    $("qty").value = (p?.qty ?? "");
+    $("supply").value = p?.supply || "temin";
+    $("siparisVeren").value = p?.siparisVeren || "";
+    $("siparisAlan").value = p?.siparisAlan || "";
+    $("dagiNeden").value = p?.dagiNeden || "iskonto";
+    $("insertName").value = p?.insertName || "";
+    $("insertDateText").value = p?.insertDateText || "";
+    $("note").value = p?.note || "";
+    $("priceDays").value = (p?.priceDays ?? "30");
+    $("skt").value = p?.skt || "";
+    refreshSupplyUI();
+  }
+
+  function openAddNew(){
+    editId=null;
+    $("addTitle").textContent="Ürün / Parti Ekle";
+    fillForm(null);
+    openModal("modalAdd");
+    setTimeout(()=>$("pName").focus(), 50);
+  }
+
+  function openEdit(id){
+    const p=state.products.find(x=>x.id===id && !x.removed);
+    if(!p){ toast("Ürün yok"); return; }
+    editId=id;
+    $("addTitle").textContent="Düzenle";
+    fillForm(p);
+    closeModal("modalActions");
+    openModal("modalAdd");
+    setTimeout(()=>$("pName").focus(), 50);
+  }
+
+  function openActions(id){
+    const p=state.products.find(x=>x.id===id && !x.removed);
+    if(!p) return;
+    selectedId=id;
+    $("actTitle").textContent=p.name || "İşlem";
+    openModal("modalActions");
+  }
+
+  function doRemove(id, reason, note){
+    const p=state.products.find(x=>x.id===id && !x.removed);
+    if(!p) return;
+    p.removed=true;
+    p.removedAt=Date.now();
+    p.removeReason=reason;
+    p.removeNote=note||"";
+    save();
     render();
   }
 
-  function filteredItems(){
-    const items = getItems().filter(x => !x.removed);
-    const t = today();
-
-    let arr = items;
-
-    if(state.query.trim()){
-      const s = state.query.trim().toLowerCase();
-      arr = arr.filter(x =>
-        (x.name||'').toLowerCase().includes(s) ||
-        (x.temin||'').toLowerCase().includes(s) ||
-        (x.insertName||'').toLowerCase().includes(s)
-      );
-    }
-
-    if(state.view === 'skt10'){
-      arr = arr.filter(x => {
-        if(!x.skt) return false;
-        const d = fromYMD(x.skt);
-        const left = diffDays(d, t); // d - today
-        return left >= 0 && left <= 10;
-      }).sort((a,b)=> fromYMD(a.skt)-fromYMD(b.skt));
-    } else if(state.view === 'dashboard'){
-      // dashboard: show alerts first (expired + price30)
-      arr = arr.slice().sort((a,b)=>{
-        const aD = a.skt ? diffDays(fromYMD(a.skt), t) : 99999;
-        const bD = b.skt ? diffDays(fromYMD(b.skt), t) : 99999;
-        return aD - bD;
-      });
-    } else if(state.view === 'all'){
-      arr = arr.slice().sort((a,b)=> (a.name||'').localeCompare(b.name||'', 'tr'));
-    }
-
+  function getFiltered(){
+    const q=($("q").value||"").trim().toLowerCase();
+    let arr=state.products.filter(p=>!p.removed);
+    if(q) arr=arr.filter(p=>String(p.name||"").toLowerCase().includes(q));
+    arr.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     return arr;
   }
 
-  function chipsForView(){
-    const items = getItems().filter(x => !x.removed);
-    const t = today();
+  function cardHTML(p){
+    const d=daysUntil(p.skt);
+    const critical = d < 0;
+    const pd = Number(p.priceDays||0);
+    const priceHit = pd>0 && d<=pd && d>=0;
 
-    const total = items.length;
+    let cls="card";
+    if(critical) cls+=" blinkRed";
+    else if(priceHit) cls+=" blinkGreen";
 
-    const expired = items.filter(x => x.skt && diffDays(fromYMD(x.skt), t) <= 0).length;
-    const near10 = items.filter(x => x.skt && (()=>{
-      const left = diffDays(fromYMD(x.skt), t);
-      return left >=0 && left<=10;
-    })()).length;
-    const price30 = items.filter(x => x.price30 && x.skt && diffDays(fromYMD(x.skt), t) <= 30 && diffDays(fromYMD(x.skt), t) >= 0).length;
-
-    return [
-      { label:'Toplam', val: total },
-      { label:'SKT geçti/bugün', val: expired },
-      { label:'Son 10 gün', val: near10 },
-      { label:'Fiyat(30g)', val: price30 }
-    ];
-  }
-
-  function screenLabel(){
-    if(state.view==='dashboard') return 'Ana';
-    if(state.view==='all') return 'Tüm Ürünler';
-    if(state.view==='skt10') return 'SKT: Son 10 Gün';
-    if(state.view==='removed') return 'Kaldırılanlar';
-    return 'Ekran';
+    const tag = (d===99999) ? "-" : (d<0 ? "GEÇTİ" : (d+"g"));
+    return `
+      <div class="${cls}" data-id="${p.id}">
+        <div class="row">
+          <div class="title">${esc(p.name)}</div>
+          <div class="tag">${tag}</div>
+        </div>
+        <div class="sub">Adet: ${p.qty||0} • SKT: ${esc(p.skt||"-")} • Temin: ${esc(p.supply||"-")}</div>
+      </div>
+    `;
   }
 
   function render(){
-    const label = screenLabel();
-    screenTitle.textContent = `Ekran: ${label}`;
-    shareHint.textContent = label;
+    const arr=getFiltered();
+    const critical=arr.filter(p=>daysUntil(p.skt) < 0);
+    const price=arr.filter(p=>{
+      const d=daysUntil(p.skt);
+      const pd=Number(p.priceDays||0);
+      return pd>0 && d<=pd && d>=0;
+    });
 
-    // chips
-    chipsEl.innerHTML = '';
-    const chips = chipsForView();
-    for(const c of chips){
-      const el = document.createElement('div');
-      el.className = 'chip';
-      el.innerHTML = `<strong>${c.val}</strong> ${c.label}`;
-      chipsEl.appendChild(el);
-    }
+    $("pillCritical").textContent="Kritik: "+critical.length;
+    $("pillPrice").textContent="Fiyat: "+price.length;
+    $("pillAll").textContent="Toplam: "+arr.length;
 
-    // list
-    listEl.innerHTML = '';
-    if(state.view === 'removed'){
-      renderRemoved();
-      return;
-    }
+    $("criticalList").innerHTML = critical.map(cardHTML).join("") || `<div class="sub">Yok</div>`;
+    $("priceList").innerHTML    = price.map(cardHTML).join("") || `<div class="sub">Yok</div>`;
+    $("allList").innerHTML      = arr.map(cardHTML).join("") || `<div class="sub">Henüz ürün yok</div>`;
 
-    const arr = filteredItems();
-    if(arr.length === 0){
-      const empty = document.createElement('div');
-      empty.className = 'card';
-      empty.innerHTML = `<div class="name">Liste boş</div><div class="hint">Menüden “Ürün / Parti Ekle” ile kayıt gir.</div>`;
-      listEl.appendChild(empty);
-      return;
-    }
+    // click bindings
+    ["criticalList","priceList","allList"].forEach(listId=>{
+      const el=$(listId);
+      el.querySelectorAll("[data-id]").forEach(node=>{
+        node.addEventListener("click", ()=>openActions(node.getAttribute("data-id")));
+      });
+    });
 
-    const frag = document.createDocumentFragment();
-    const t = today();
-
-    for(const it of arr){
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.dataset.id = it.id;
-
-      // alert styles
-      let blinkClass = '';
-      let tags = [];
-
-      if(it.skt){
-        const left = diffDays(fromYMD(it.skt), t);
-        if(left <= 0){
-          blinkClass = 'blink-red'; // SKT geldi/geçti
-          tags.push(`<span class="tag red">SKT: ${fmtTR(it.skt)}</span>`);
-        } else if(left <= 10){
-          tags.push(`<span class="tag dark">SKT: ${fmtTR(it.skt)} (${left}g)</span>`);
-        } else {
-          tags.push(`<span class="tag">SKT: ${fmtTR(it.skt)}</span>`);
-        }
-
-        if(it.price30 && left <= 30 && left >= 0){
-          blinkClass = blinkClass || 'blink-green';
-          tags.push(`<span class="tag green">Fiyat iste: ${left}g</span>`);
-        }
-      }
-
-      if(it.temin){
-        tags.push(`<span class="tag">Temin: ${it.temin}</span>`);
-      }
-      if(it.temin === 'Dağılım'){
-        tags.push(`<span class="tag">Dağılım/Insert</span>`);
-        if(it.insertName) tags.push(`<span class="tag">Insert: ${escapeHtml(it.insertName)}</span>`);
-        if(it.insertDate) tags.push(`<span class="tag">Tarih: ${fmtTR(it.insertDate)}</span>`);
-      }
-
-      card.classList.add(blinkClass);
-
-      card.innerHTML = `
-        <div class="cardTop">
-          <div>
-            <div class="name">${escapeHtml(it.name || '(İsimsiz)')}</div>
-          </div>
-          <div class="qty">${Number(it.qty||0)} adet</div>
-        </div>
-        <div class="meta">${tags.join('')}</div>
-        <div class="actionsRow">
-          <button class="btn ghost" data-act="edit">Düzenle</button>
-          <button class="btn ghost" data-act="remove">Kaldır</button>
-        </div>
-      `;
-
-      frag.appendChild(card);
-    }
-    listEl.appendChild(frag);
+    // paylaşım modu: kullanıcı hangi bölümdeyse ona göre (scroll’a göre basit)
+    // En üstte hangi başlık görünüyorsa onu baz alalım:
+    // (Basit/sağlam: share her zaman filtreli listeyi paylaşır; q varsa q’ya göre.)
+    // currentShareMode sadece metin başlığı için:
+    currentShareMode = "all";
   }
 
-  function renderRemoved(){
-    const arr = getRemoved().slice().reverse();
-    if(arr.length===0){
-      const empty = document.createElement('div');
-      empty.className = 'card';
-      empty.innerHTML = `<div class="name">Kaldırılan yok</div><div class="hint">Kaldırdıkların burada görünür.</div>`;
-      listEl.appendChild(empty);
-      return;
-    }
+  function currentShareText(){
+    const arr=getFiltered();
 
-    const frag=document.createDocumentFragment();
-    for(const it of arr){
-      const card=document.createElement('div');
-      card.className='card';
-      card.innerHTML = `
-        <div class="cardTop">
-          <div>
-            <div class="name">${escapeHtml(it.name||'(İsimsiz)')}</div>
-            <div class="hint">Kaldırma nedeni: <b>${escapeHtml(it.removeReason||'-')}</b> • ${it.removedAt ? fmtTR(it.removedAt) : ''}</div>
-          </div>
-          <div class="qty">${Number(it.qty||0)} adet</div>
-        </div>
-        <div class="meta">
-          ${it.skt ? `<span class="tag">SKT: ${fmtTR(it.skt)}</span>` : ''}
-          ${it.note ? `<span class="tag">Not: ${escapeHtml(it.note)}</span>` : ''}
-        </div>
-      `;
-      frag.appendChild(card);
-    }
-    listEl.appendChild(frag);
-  }
+    // Ekran mantığı: kritik + fiyat + tüm ürünler var.
+    // Paylaş: 3 blok halinde üret
+    const critical = arr.filter(p=>daysUntil(p.skt) < 0);
+    const price = arr.filter(p=>{
+      const d=daysUntil(p.skt);
+      const pd=Number(p.priceDays||0);
+      return pd>0 && d<=pd && d>=0;
+    });
 
-  // Share
-  async function shareCurrent(){
-    const label = screenLabel();
-    let text = `stok_kontrol • ${label}\n`;
-
-    if(state.view==='removed'){
-      const arr = getRemoved().slice().reverse().slice(0, 60);
-      for(const it of arr){
-        text += `• ${it.name} — ${it.qty} adet — Neden: ${it.removeReason || '-'}\n`;
-      }
-    } else {
-      const arr = filteredItems().slice(0, 80);
-      for(const it of arr){
-        let line = `• ${it.name} — ${it.qty} adet`;
-        if(it.skt) line += ` — SKT: ${fmtTR(it.skt)}`;
-        if(it.temin) line += ` — ${it.temin}`;
-        if(it.temin==='Dağılım' && it.insertName) line += ` — Insert: ${it.insertName}`;
-        text += line + '\n';
-      }
-    }
-
-    try{
-      if(navigator.share){
-        await navigator.share({ text });
-      } else {
-        await navigator.clipboard.writeText(text);
-        showToast('Paylaşım metni kopyalandı');
-      }
-    }catch(_){
-      // fallback
-      try{
-        await navigator.clipboard.writeText(text);
-        showToast('Paylaşım metni kopyalandı');
-      }catch(__){
-        alert(text);
-      }
-    }
-  }
-
-  // CRUD
-  function upsertItem(){
-    const nm = nameInp.value.trim();
-    const qty = parseInt(qtyInp.value.trim() || '0', 10);
-
-    if(!nm){
-      showToast('Ürün adı gerekli');
-      nameInp.focus();
-      return;
-    }
-    if(!Number.isFinite(qty) || qty < 0){
-      showToast('Adet sayısı geçersiz');
-      qtyInp.focus();
-      return;
-    }
-
-    const it = {
-      id: state.editingId || uid(),
-      name: nm,
-      qty,
-      skt: wheelSKT.getYMD(),
-      temin: teminSel.value,
-      distReason: distReasonSel.value,
-      insertName: insertNameInp.value.trim(),
-      insertDate: wheelINS.getYMD(),
-      price30: price30Sel.value === '1',
-      note: noteInp.value.trim(),
-      updatedAt: toYMD(today())
+    const fmt = (p)=>{
+      const d=daysUntil(p.skt);
+      const pd=Number(p.priceDays||0);
+      const tag = d<0 ? "KRİTİK" : (pd>0 && d<=pd ? "FİYAT" : "NORMAL");
+      return `- ${p.name} | ${p.qty} adet | SKT ${p.skt} | ${tag}`;
     };
 
-    const items = getItems();
-    const idx = items.findIndex(x => x.id === it.id);
+    let out=[];
+    out.push("stok_kontrol");
+    out.push("");
+    out.push("KRİTİK (SKT geçti):");
+    out.push(critical.length ? critical.map(fmt).join("\n") : "- Yok");
+    out.push("");
+    out.push("FİYAT ZAMANI (son 30 gün vb):");
+    out.push(price.length ? price.map(fmt).join("\n") : "- Yok");
+    out.push("");
+    out.push("TÜM ÜRÜNLER:");
+    out.push(arr.length ? arr.map(fmt).join("\n") : "- Yok");
 
-    if(idx >= 0){
-      items[idx] = { ...items[idx], ...it };
-      setItems(items);
-      showToast('Güncellendi');
+    return out.join("\n");
+  }
+
+  async function shareText(text){
+    text=String(text||"").trim();
+    if(!text){ toast("Paylaşacak şey yok"); return; }
+
+    // APK/WebView: AndroidBridge ile açılır
+    if(window.AndroidBridge && typeof window.AndroidBridge.share==="function"){
+      try{ window.AndroidBridge.share(text); return; }catch(_){}
+    }
+
+    // Tarayıcı testinde: Web Share varsa dener, yoksa kopyalar
+    if(navigator.share){
+      try{ await navigator.share({ text }); return; }catch(_){}
+    }
+    try{
+      await navigator.clipboard.writeText(text);
+      toast("Kopyalandı (tarayıcı testi)");
+    }catch(_){
+      toast("Kopyalanamadı");
+    }
+  }
+
+  // Save flow: Kaydet -> SKT wheel -> Tamam -> kaydet
+  function stageSave(){
+    const name=($("pName").value||"").trim();
+    const qty=parseInt(($("qty").value||"0"),10)||0;
+    if(!name){ toast("Ürün adı lazım"); $("pName").focus(); return; }
+    if(qty<=0){ toast("Adet 0 olamaz"); $("qty").focus(); return; }
+
+    const skt=($("skt").value||"").trim();
+    if(!skt){ showWheel(""); return; }
+    finalizeSave();
+  }
+
+  function finalizeSave(){
+    const now=Date.now();
+    const obj={
+      id: editId || ("p_"+now+"_"+Math.random().toString(16).slice(2)),
+      name: ($("pName").value||"").trim(),
+      qty: parseInt(($("qty").value||"0"),10)||0,
+      skt: ($("skt").value||"").trim(),
+      supply: $("supply").value,
+      siparisVeren: ($("siparisVeren").value||"").trim(),
+      siparisAlan: ($("siparisAlan").value||"").trim(),
+      dagiNeden: $("dagiNeden").value,
+      insertName: ($("insertName").value||"").trim(),
+      insertDateText: ($("insertDateText").value||"").trim(),
+      note: ($("note").value||"").trim(),
+      priceDays: parseInt(($("priceDays").value||"0"),10)||0,
+      createdAt: now
+    };
+
+    if(editId){
+      const i=state.products.findIndex(x=>x.id===editId);
+      if(i>=0){
+        obj.createdAt = state.products[i].createdAt || obj.createdAt;
+        state.products[i]=obj;
+      }else{
+        state.products.push(obj);
+      }
     }else{
-      items.push(it);
-      setItems(items);
-      showToast('Kaydedildi');
+      state.products.push(obj);
     }
 
-    closeModal();
+    save();
     render();
+
+    // hızlı seri giriş: kaydedince form temizle + kapat
+    editId=null;
+    fillForm(null);
+    closeModal("modalAdd");
+    toast("Kaydedildi");
   }
 
-  function askRemove(id){
-    const items = getItems();
-    const it = items.find(x=>x.id===id);
-    if(!it) return;
+  function bind(){
+    $("menuBtn").addEventListener("click", openDrawer);
+    $("drawerBack").addEventListener("click", closeDrawer);
 
-    // mini reason picker (prompt)
-    const reason = prompt(
-`Kaldırma nedeni yaz:
-- skt
-- fabrika kaynaklı
-- kırık, zarar gördü
-- diğer`
-    );
+    $("openAddFromMenu").addEventListener("click", ()=>{ closeDrawer(); openAddNew(); });
 
-    if(reason === null) return; // cancel
-
-    const cleaned = reason.trim() || 'diğer';
-
-    // remove from active
-    const next = items.filter(x=>x.id!==id);
-    setItems(next);
-
-    // push to removed
-    const rem = getRemoved();
-    rem.push({
-      ...it,
-      removeReason: cleaned,
-      removedAt: toYMD(today())
+    $("copyBtn").addEventListener("click", async ()=>{
+      const t=currentShareText();
+      try{ await navigator.clipboard.writeText(t); toast("Kopyalandı"); }catch(_){ toast("Kopyalanamadı"); }
+      closeDrawer();
     });
-    setRemoved(rem);
 
-    showToast('Kaldırıldı');
+    $("searchBtn").addEventListener("click", ()=>{
+      const w=$("searchWrap");
+      w.style.display = (w.style.display==="block") ? "none" : "block";
+      if(w.style.display==="block") setTimeout(()=>$("q").focus(), 30);
+    });
+
+    $("q").addEventListener("input", render);
+
+    $("modalBack").addEventListener("click", closeAllModals);
+    $("closeAdd").addEventListener("click", ()=>closeModal("modalAdd"));
+    $("closeAct").addEventListener("click", ()=>closeModal("modalActions"));
+    $("closeRem").addEventListener("click", ()=>closeModal("modalRemove"));
+
+    $("supply").addEventListener("change", refreshSupplyUI);
+    $("dagiNeden").addEventListener("change", refreshSupplyUI);
+
+    $("pName").addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); $("qty").focus(); }});
+    $("qty").addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); stageSave(); }});
+    $("saveAdd").addEventListener("click", stageSave);
+
+    $("actEdit").addEventListener("click", ()=>openEdit(selectedId));
+    $("actRemove").addEventListener("click", ()=>{
+      closeModal("modalActions");
+      openModal("modalRemove");
+    });
+
+    $("confirmRem").addEventListener("click", ()=>{
+      const reason=$("remReason").value;
+      const note=$("remNote").value||"";
+      doRemove(selectedId, reason, note);
+      $("remNote").value="";
+      closeModal("modalRemove");
+      toast("Kaldırıldı");
+    });
+
+    $("dwClose").addEventListener("click", hideWheel);
+    $("dwBack").addEventListener("click", hideWheel);
+    $("dwToday").addEventListener("click", ()=>{
+      const t=new Date();
+      $("dwDay").value=String(t.getDate());
+      $("dwMonth").value=String(t.getMonth()+1);
+      $("dwYear").value=String(t.getFullYear());
+    });
+    $("dwOk").addEventListener("click", ()=>{
+      $("skt").value = wheelValue();
+      hideWheel();
+      finalizeSave();
+    });
+
+    $("shareFab").addEventListener("click", ()=>{
+      shareText(currentShareText());
+    });
+
+    refreshSupplyUI();
     render();
   }
 
-  // Helpers
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, (c)=>({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    })[c]);
-  }
-
-  // Events
-  btnMenu.addEventListener('click', openDrawer);
-  btnDrawerClose.addEventListener('click', closeDrawer);
-  drawerBackdrop.addEventListener('click', closeDrawer);
-
-  drawer.addEventListener('click', (e)=>{
-    const b = e.target.closest('button[data-nav]');
-    if(!b) return;
-    closeDrawer();
-    setView(b.dataset.nav);
-  });
-
-  btnAddFromMenu.addEventListener('click', ()=>{
-    closeDrawer();
-    openModal(null);
-  });
-
-  btnSearch.addEventListener('click', ()=>{
-    state.searchOn = !state.searchOn;
-    searchWrap.style.display = state.searchOn ? 'flex' : 'none';
-    if(state.searchOn) setTimeout(()=>q.focus(), 50);
-    else { state.query=''; q.value=''; render(); }
-  });
-
-  q.addEventListener('input', ()=>{
-    state.query = q.value;
-    render();
-  });
-
-  btnClear.addEventListener('click', ()=>{
-    state.query='';
-    q.value='';
-    render();
-  });
-
-  shareFab.addEventListener('click', shareCurrent);
-
-  btnModalClose.addEventListener('click', closeModal);
-  modalBackdrop.addEventListener('click', closeModal);
-
-  btnSave.addEventListener('click', upsertItem);
-
-  btnDelete.addEventListener('click', ()=>{
-    if(!state.editingId) return;
-    askRemove(state.editingId);
-    closeModal();
-  });
-
-  // card actions
-  listEl.addEventListener('click', (e)=>{
-    const actBtn = e.target.closest('button[data-act]');
-    if(!actBtn) return;
-    const card = e.target.closest('.card');
-    if(!card) return;
-    const id = card.dataset.id;
-    const act = actBtn.dataset.act;
-
-    if(act==='edit') openModal(id);
-    if(act==='remove') askRemove(id);
-  });
-
-  // Enter flow: name -> qty -> save
-  nameInp.addEventListener('keydown', (e)=>{
-    if(e.key==='Enter'){
-      e.preventDefault();
-      qtyInp.focus();
-    }
-  });
-  qtyInp.addEventListener('keydown', (e)=>{
-    if(e.key==='Enter'){
-      e.preventDefault();
-      btnSave.click();
-    }
-  });
-
-  // Boot
-  setView('dashboard');
+  window.addEventListener("load", bind);
 })();

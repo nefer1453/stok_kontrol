@@ -1,1 +1,1 @@
-# boş
+# boş bırakılabilir
