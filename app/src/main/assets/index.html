@@ -2,495 +2,523 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#2e7d32" />
-  <title>Stok Kontrol</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#1f7a3a" />
+  <title>stok_kontrol</title>
+
   <style>
     :root{
-      --bg:#ffffff;
-      --fg:#0c1410;
-      --muted:#6b7280;
-      --card:#ffffff;
-      --line:#e5e7eb;
-      --green:#2e7d32;
-      --green2:#1b5e20;
-      --red:#d32f2f;
-      --amber:#f59e0b;
-      --shadow: 0 14px 40px rgba(0,0,0,.08);
-      --radius: 16px;
+      --bg: #ffffff;
+      --card: #f6fff7;
+      --text: #0b1b10;
+      --muted:#3a5b45;
+      --green:#1f7a3a;          /* çimen yeşili */
+      --green2:#2ea44f;
+      --red:#d93025;
+      --border:#cfe7d6;
+      --shadow: 0 10px 30px rgba(0,0,0,.10);
+      --r: 16px;
     }
     *{box-sizing:border-box}
     body{
       margin:0;
       font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial;
-      background:var(--bg);
-      color:var(--fg);
+      background: var(--bg);
+      color: var(--text);
     }
 
+    /* HEADER */
     header{
-      position:sticky; top:0; z-index:20;
-      background:linear-gradient(180deg,#ffffff,#f8fafc);
-      border-bottom:1px solid var(--line);
-      padding:10px 12px;
-      display:flex; align-items:center; gap:10px;
+      position: sticky;
+      top:0;
+      z-index: 20;
+      background: linear-gradient(180deg, rgba(31,122,58,.95), rgba(31,122,58,.88));
+      color:#fff;
+      padding: 12px 12px 10px;
+      box-shadow: 0 8px 18px rgba(0,0,0,.10);
+      backdrop-filter: blur(10px);
     }
-    .iconbtn{
-      border:1px solid var(--line);
-      background:#fff;
-      border-radius:12px;
-      padding:10px 12px;
-      font-weight:900;
-      box-shadow:0 6px 20px rgba(0,0,0,.06);
-    }
-    .title{
-      font-weight:900;
-      color:var(--green2);
-      letter-spacing:.2px;
-    }
-    .spacer{flex:1}
-    #searchBtn{
-      border:1px solid rgba(46,125,50,.35);
-      background:rgba(46,125,50,.07);
-      color:var(--green2);
-    }
-
-    main{padding:12px 12px 90px}
-
-    .pillbar{
-      display:flex; gap:8px; flex-wrap:wrap;
-      margin:10px 0;
-    }
-    .pill{
-      border:1px solid var(--line);
-      background:#fff;
-      border-radius:999px;
-      padding:8px 10px;
-      font-weight:800;
-      color:#14532d;
-    }
-
-    .sectionTitle{
-      font-size:14px;
-      color:var(--muted);
-      margin:14px 4px 8px;
-      font-weight:900;
-      text-transform:uppercase;
-      letter-spacing:.06em;
-    }
-
-    .grid{
-      display:grid;
-      grid-template-columns: 1fr;
+    .topbar{
+      display:flex;
+      align-items:center;
       gap:10px;
     }
-    .card{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      padding:12px;
-      box-shadow:0 10px 26px rgba(0,0,0,.06);
+    .iconbtn{
+      width:44px;height:44px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.25);
+      background: rgba(255,255,255,.12);
+      color:#fff;
+      display:grid;
+      place-items:center;
+      font-size: 20px;
     }
-    .row{display:flex; gap:10px; align-items:center}
-    .grow{flex:1}
-    .name{font-weight:950}
-    .meta{color:var(--muted); font-weight:800; font-size:13px; margin-top:2px}
-    .badge{
-      font-weight:950;
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background:#fff;
-      color:#111827;
-      font-size:12px;
+    .titlepill{
+      flex:1;
+      height:44px;
+      border-radius: 16px;
+      border:1px solid rgba(255,255,255,.25);
+      background: rgba(255,255,255,.12);
+      display:flex;
+      align-items:center;
+      padding: 0 12px;
+      font-weight: 700;
+      overflow:hidden;
+      white-space:nowrap;
+      text-overflow:ellipsis;
     }
-    .badge.red{border-color:rgba(211,47,47,.35); background:rgba(211,47,47,.06); color:#7f1d1d}
-    .badge.green{border-color:rgba(46,125,50,.35); background:rgba(46,125,50,.06); color:#14532d}
-    .badge.amber{border-color:rgba(245,158,11,.35); background:rgba(245,158,11,.08); color:#7c2d12}
+    .searchwrap{
+      margin-top: 10px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .search{
+      flex:1;
+      height:44px;
+      border-radius: 16px;
+      border:1px solid rgba(255,255,255,.25);
+      background: rgba(255,255,255,.12);
+      color:#fff;
+      padding: 0 12px;
+      outline:none;
+      font-size: 15px;
+    }
+    .search::placeholder{ color: rgba(255,255,255,.75); }
 
-    /* Blink (2sn periyot) */
-    @keyframes blink2 { 0%,49%{opacity:1} 50%,100%{opacity:.25} }
-    .blink-red { border-color:rgba(211,47,47,.5) !important; animation:blink2 2s infinite; }
-    .blink-green { border-color:rgba(46,125,50,.5) !important; animation:blink2 2s infinite; }
+    main{
+      padding: 14px;
+      padding-bottom: 110px; /* alt fab alanı */
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    /* CARDS/LISTS */
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-bottom: 10px;
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border:1px solid var(--border);
+      background: var(--card);
+      color: var(--muted);
+      font-weight:600;
+      font-size: 13px;
+    }
+    .chip strong{color:var(--text)}
+    .btn{
+      border:none;
+      border-radius: 14px;
+      height:44px;
+      padding: 0 14px;
+      font-weight: 700;
+      color:#fff;
+      background: var(--green);
+    }
+    .btn.ghost{
+      background: transparent;
+      color: var(--green);
+      border: 1px solid var(--border);
+    }
+
+    .list{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .card{
+      border:1px solid var(--border);
+      background: var(--card);
+      border-radius: var(--r);
+      padding: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.06);
+    }
+    .cardTop{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .name{
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing:.2px;
+    }
+    .qty{
+      font-size: 14px;
+      font-weight:800;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border:1px solid var(--border);
+      color: var(--green);
+      background: #fff;
+      white-space:nowrap;
+    }
+    .meta{
+      margin-top: 8px;
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .tag{
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border:1px solid var(--border);
+      background:#fff;
+      color: var(--muted);
+    }
+    .tag.red{ color: var(--red); border-color: rgba(217,48,37,.25); }
+    .tag.green{ color: var(--green); border-color: rgba(31,122,58,.25); }
+    .tag.dark{ color:#0b1b10; }
+
+    .actionsRow{
+      margin-top: 10px;
+      display:flex;
+      justify-content:flex-start;
+      gap:10px;
+    }
+
+    /* Floating Share FAB (sağ-alt, o anki listeye göre) */
+    #shareFab{
+      position: fixed;
+      right: 14px;
+      bottom: 16px;
+      z-index: 15;
+      height: 56px;
+      border-radius: 18px;
+      padding: 0 16px;
+      background: linear-gradient(180deg, var(--green2), var(--green));
+      color:#fff;
+      border:none;
+      font-weight: 900;
+      box-shadow: var(--shadow);
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    #shareFab small{opacity:.9;font-weight:700}
 
     /* Drawer */
-    #drawerBack{
-      position:fixed; inset:0;
-      background:rgba(0,0,0,.35);
-      opacity:0; pointer-events:none;
-      transition:.15s; z-index:50;
+    #drawerBackdrop{
+      position: fixed;
+      inset:0;
+      background: rgba(0,0,0,.35);
+      z-index: 30;
+      display:none;
     }
-    #drawerBack.show{opacity:1; pointer-events:auto}
     #drawer{
-      position:fixed; left:0; top:0; bottom:0;
-      width:min(86vw,320px);
-      background:#fff;
-      transform:translateX(-105%);
-      transition:.18s;
-      z-index:60;
-      border-right:1px solid var(--line);
-      box-shadow:var(--shadow);
-      padding:12px;
+      position: fixed;
+      top:0; left:0;
+      height:100%;
+      width: 290px;
+      background: #ffffff;
+      border-right: 1px solid var(--border);
+      z-index: 31;
+      transform: translateX(-100%);
+      transition: transform .18s ease;
+      padding: 12px;
     }
-    #drawer.show{transform:translateX(0)}
-    .navbtn{
+    #drawer.open{ transform: translateX(0); }
+    #drawerBackdrop.open{ display:block; }
+    .dHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom: 8px;
+    }
+    .dTitle{
+      font-weight: 1000;
+      color: var(--green);
+    }
+    .dItem{
       width:100%;
       text-align:left;
-      padding:12px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:#fff;
-      font-weight:900;
-      margin-bottom:10px;
-    }
-    .navbtn.primary{
-      border-color:rgba(46,125,50,.35);
-      background:rgba(46,125,50,.06);
-      color:var(--green2);
+      height: 46px;
+      border-radius: 14px;
+      border:1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-weight: 900;
+      padding: 0 12px;
+      margin-top: 10px;
     }
 
     /* Modal */
-    #modalBack{
-      position:fixed; inset:0;
-      background:rgba(0,0,0,.42);
-      opacity:0; pointer-events:none;
-      transition:.15s;
-      z-index:80;
-    }
-    #modalBack.show{opacity:1; pointer-events:auto}
-    .modal{
-      position:fixed; left:50%; top:50%;
-      transform:translate(-50%,-50%);
-      width:min(94vw,520px);
-      background:#fff;
-      border:1px solid var(--line);
-      border-radius:18px;
-      box-shadow:0 18px 60px rgba(0,0,0,.25);
+    #modalBackdrop{
+      position: fixed;
+      inset:0;
+      background: rgba(0,0,0,.35);
+      z-index: 50;
       display:none;
-      z-index:90;
-      overflow:hidden;
     }
-    .modal.show{display:block}
-    .mhead{
-      padding:12px 14px;
-      border-bottom:1px solid var(--line);
-      display:flex; gap:10px; align-items:center;
-      background:linear-gradient(180deg,#fff,#f8fafc);
+    #modal{
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%,-50%);
+      width: min(640px, calc(100vw - 22px));
+      max-height: 92vh;          /* <<< taşmayı kes */
+      overflow: auto;            /* <<< kendi içinde scroll */
+      background: #fff;
+      border:1px solid var(--border);
+      border-radius: 20px;
+      z-index: 51;
+      box-shadow: var(--shadow);
+      display:none;
+      padding-bottom: 96px;      /* <<< Kaydet için alt güvenli alan */
     }
-    .mhead .mtitle{font-weight:950; color:var(--green2)}
-    .mbody{padding:12px 14px}
-    .actions{display:flex; gap:10px; justify-content:flex-end; padding:12px 14px; border-top:1px solid var(--line); background:#fff}
-    .btn{
-      border:1px solid var(--line);
+    .mHead{
+      position: sticky;
+      top:0;
       background:#fff;
-      border-radius:14px;
-      padding:10px 12px;
-      font-weight:950;
+      z-index: 2;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      padding: 12px;
+      border-bottom:1px solid var(--border);
     }
-    .btn.primary{
-      border-color:rgba(46,125,50,.35);
-      background:rgba(46,125,50,.08);
-      color:var(--green2);
+    .mHead .ttl{
+      font-weight: 1000;
+      color: var(--green);
+      font-size: 18px;
     }
-    .btn.danger{
-      border-color:rgba(211,47,47,.35);
-      background:rgba(211,47,47,.08);
-      color:#7f1d1d;
+    .mBody{ padding: 12px; }
+    .field{
+      margin-top: 12px;
     }
-
-    .field{margin:10px 0}
-    label{display:block; font-size:12px; color:var(--muted); font-weight:900; margin:0 0 6px 2px}
-    input,select,textarea{
+    .field label{
+      display:block;
+      font-size: 13px;
+      font-weight: 900;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .inp, select, textarea{
       width:100%;
-      padding:12px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      font-weight:800;
+      height: 48px;
+      border-radius: 16px;
+      border:1px solid var(--border);
+      padding: 0 12px;
+      font-size: 16px;
       outline:none;
-      background:#fff;
+      background: #fff;
     }
-    textarea{resize:vertical}
+    textarea{
+      height: 92px;
+      padding: 10px 12px;
+      resize: vertical;
+    }
+    .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .wheel{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      padding: 10px;
+      border:1px solid var(--border);
+      border-radius: 18px;
+      background: var(--card);
+    }
+    .wheel select{ height: 56px; font-weight: 900; }
+    .hint{
+      margin-top: 10px;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+    }
 
-    /* Share FAB */
-    #shareFab{
-      position:fixed; right:16px; bottom:16px;
-      z-index:120;
-      border-radius:18px;
-      border:2px solid rgba(46,125,50,.35);
-      background:rgba(46,125,50,.12);
-      color:var(--green2);
-      padding:12px 14px;
-      font-weight:950;
-      box-shadow:0 16px 46px rgba(0,0,0,.18);
+    .mActions{
+      position: sticky;
+      bottom: 0;
+      z-index: 3;
+      background: linear-gradient(180deg, rgba(255,255,255,.86), #fff);
+      border-top: 1px solid var(--border);
+      padding: 12px;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+      display:flex;
+      gap:10px;
     }
+    .mActions .btn{ flex:1; }
 
-    /* Search modal quick */
-    #searchBox{display:none}
-    #searchBox.show{display:block}
+    /* <<< FIX A: Modal açıkken Paylaş FAB gizle */
+    body.modal-open #shareFab{ display:none !important; }
 
-    /* Date Wheel (Sheet) */
-    #dwBack{
-      position:fixed; inset:0;
-      background:rgba(0,0,0,.55);
-      opacity:0; pointer-events:none;
-      transition:.15s;
-      z-index:200;
-    }
-    #dwBack.show{opacity:1; pointer-events:auto}
-    #dwSheet{
-      position:fixed; left:50%; bottom:-420px;
-      transform:translateX(-50%);
-      width:min(96vw,520px);
-      background:#fff;
-      border:1px solid var(--line);
-      border-radius:18px 18px 0 0;
-      box-shadow:0 -18px 60px rgba(0,0,0,.25);
-      transition:.18s;
-      z-index:210;
-      overflow:hidden;
-    }
-    #dwSheet.show{bottom:0}
-    #dwHead{
-      padding:12px 14px;
-      border-bottom:1px solid var(--line);
-      display:flex; align-items:center; gap:10px;
-      background:linear-gradient(180deg,#fff,#f8fafc);
-    }
-    #dwTitle{font-weight:950; color:var(--green2)}
-    #dwBody{
-      display:flex; gap:10px;
-      padding:14px;
-    }
-    .dwCol{flex:1}
-    .dwCol select{
-      height:210px;
-      font-size:18px;
-      font-weight:950;
+    /* Blink */
+    @keyframes blinkRed { 0%,49%{outline:2px solid rgba(217,48,37,.0)} 50%,100%{outline:2px solid rgba(217,48,37,.55)} }
+    @keyframes blinkGreen { 0%,49%{outline:2px solid rgba(31,122,58,.0)} 50%,100%{outline:2px solid rgba(31,122,58,.55)} }
+    .blink-red{ animation: blinkRed 2s linear infinite; }
+    .blink-green{ animation: blinkGreen 2s linear infinite; }
+
+    /* Small toast */
+    #toast{
+      position: fixed;
+      left: 50%;
+      bottom: 86px;
+      transform: translateX(-50%);
+      background: #0b1b10;
+      color:#fff;
+      padding: 10px 12px;
+      border-radius: 14px;
+      font-weight: 800;
+      z-index: 80;
+      display:none;
+      box-shadow: var(--shadow);
+      max-width: min(520px, calc(100vw - 24px));
       text-align:center;
-      border-radius:16px;
-      padding:8px;
     }
-    #dwActions{
-      display:flex; gap:10px; justify-content:flex-end;
-      padding:12px 14px;
-      border-top:1px solid var(--line);
-      background:#fff;
+
+    @media (max-width:520px){
+      .grid2{ grid-template-columns: 1fr; }
+      #shareFab{ left: 14px; right: 14px; justify-content:center; }
     }
   </style>
 </head>
+
 <body>
+  <header>
+    <div class="topbar">
+      <button class="iconbtn" id="btnMenu" aria-label="Menü">☰</button>
+      <div class="titlepill" id="screenTitle">Ekran: Ana</div>
+      <button class="iconbtn" id="btnSearch" aria-label="Ara">🔎</button>
+    </div>
+    <div class="searchwrap" id="searchWrap" style="display:none;">
+      <input class="search" id="q" placeholder="Ürün ara..." />
+      <button class="btn ghost" id="btnClear">Temizle</button>
+    </div>
+  </header>
 
-<header>
-  <button id="menuBtn" class="iconbtn" title="Menü">≡</button>
-  <div class="title">Stok Kontrol</div>
-  <div class="spacer"></div>
-  <button id="searchBtn" class="iconbtn" title="Ara">Ara</button>
-</header>
+  <main>
+    <div class="row" id="chips"></div>
+    <div class="list" id="list"></div>
+  </main>
 
-<main>
-  <div class="pillbar">
-    <div class="pill" id="statPill">Toplam: 0</div>
-    <div class="pill" id="todayPill">Bugün kaldırılan: 0</div>
-  </div>
+  <button id="shareFab" title="Bu ekrandaki listeyi paylaş">
+    ↗ Paylaş <small id="shareHint">Ana</small>
+  </button>
 
-  <div class="sectionTitle">Ana Uyarılar</div>
-  <div class="grid" id="homeAlerts"></div>
-
-  <div class="sectionTitle" id="listTitle">Tüm Ürünler</div>
-  <div class="grid" id="allList"></div>
-</main>
-
-<button id="shareFab">Paylaş ↗</button>
-
-<div id="drawerBack"></div>
-<aside id="drawer">
-  <button class="navbtn primary" id="navAdd">+ Ürün / Parti Ekle</button>
-  <button class="navbtn" id="navHome">Ana Liste</button>
-  <button class="navbtn" id="navRemoved">Kaldırılanlar</button>
-  <button class="navbtn" id="navBackup">Yedek</button>
-  <button class="navbtn" id="navRestore">Geri Yükle</button>
-</aside>
-
-<div id="modalBack"></div>
-
-<!-- Add/Edit Modal -->
-<section class="modal" id="modalAdd">
-  <div class="mhead">
-    <div class="mtitle" id="addTitle">Ürün / Parti</div>
-    <div class="spacer"></div>
-    <button class="btn" id="closeAdd">Kapat</button>
-  </div>
-  <div class="mbody">
-    <div class="field">
-      <label>İsim</label>
-      <input id="pName" placeholder="Örn: Aytaç sosis" />
+  <!-- Drawer -->
+  <div id="drawerBackdrop"></div>
+  <aside id="drawer">
+    <div class="dHead">
+      <div class="dTitle">stok_kontrol</div>
+      <button class="iconbtn" id="btnDrawerClose" aria-label="Kapat">✕</button>
     </div>
 
-    <div class="field">
-      <label>Adet</label>
-      <input id="qty" inputmode="numeric" placeholder="Örn: 15" />
+    <button class="dItem" data-nav="dashboard">🏠 Ana (Uyarılar)</button>
+    <button class="dItem" data-nav="all">📦 Tüm Ürünler</button>
+    <button class="dItem" data-nav="skt10">⏳ SKT: Son 10 Gün</button>
+    <button class="dItem" data-nav="removed">🗑️ Kaldırılanlar</button>
+
+    <button class="dItem" id="btnAddFromMenu">＋ Ürün / Parti Ekle</button>
+  </aside>
+
+  <!-- Modal -->
+  <div id="modalBackdrop"></div>
+  <section id="modal" role="dialog" aria-modal="true">
+    <div class="mHead">
+      <div class="ttl" id="modalTitle">Ürün / Parti</div>
+      <button class="btn ghost" id="btnModalClose">Kapat</button>
     </div>
 
-    <div class="field">
-      <label>SKT (Kaydet deyince wheel açılır)</label>
-      <!-- görünür input yok: sadece value tutmak için -->
-      <input id="skt" type="hidden" />
-      <div class="meta" id="sktPreview">SKT: seçilmedi</div>
-    </div>
-
-    <div class="field">
-      <label>Temin</label>
-      <select id="supply">
-        <option value="siparis">Sipariş</option>
-        <option value="dagi">Dağılım</option>
-        <option value="merkez">Merkez Dağılım</option>
-      </select>
-    </div>
-
-    <div id="supplySiparis" style="display:none">
+    <div class="mBody">
       <div class="field">
-        <label>Sipariş veren</label>
-        <input id="siparisVeren" placeholder="İsim" />
-      </div>
-      <div class="field">
-        <label>Sipariş alan</label>
-        <input id="siparisAlan" placeholder="İsim" />
-      </div>
-    </div>
-
-    <div id="supplyDagi" style="display:none">
-      <div class="field">
-        <label>Neden</label>
-        <select id="dagiNeden">
-          <option value="iskonto">İskonto</option>
-          <option value="inserte_hazirlik">İnserte hazırlık</option>
-          <option value="diger">Diğer</option>
+        <label>Mod</label>
+        <select id="mode" class="inp">
+          <option value="new">Yeni ürün + parti</option>
+          <option value="add">Var olan ürüne parti ekle</option>
         </select>
       </div>
 
-      <div class="field" id="insertNameWrap" style="display:none">
-        <label>Insert adı</label>
-        <input id="insertAdi" placeholder="Örn: Şubat Insert" />
+      <div class="field">
+        <label>Ürün adı</label>
+        <input id="name" class="inp" placeholder="Örn: DANET SUCUK" />
       </div>
 
-      <div class="field" id="insertDateWrap" style="display:none">
-        <label>Insert tarihi (ister wheel ister takvim)</label>
-        <div class="row">
-          <select id="insertDateMode" style="max-width:170px">
-            <option value="wheel">Kayar</option>
-            <option value="calendar">Takvim</option>
-          </select>
-          <div class="grow"></div>
+      <div class="grid2">
+        <div class="field">
+          <label>Adet</label>
+          <input id="qty" class="inp" inputmode="numeric" placeholder="0" />
         </div>
-        <input id="insertTarihiWheel" type="hidden" />
-        <input id="insertTarihiCal" type="date" style="display:none" />
-        <div class="meta" id="insertPreview">Insert: seçilmedi</div>
+
+        <div class="field">
+          <label>SKT (kayan tarih) — ay NUMARA</label>
+          <div class="wheel" id="w_skt"></div>
+          <div class="hint">İpucu: SKT’de ay adı yok, 01-12 numara.</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Temin</label>
+        <select id="temin" class="inp">
+          <option value="Sipariş">Sipariş</option>
+          <option value="Dağılım">Dağılım</option>
+          <option value="Diğer">Diğer</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Dağılım nedeni</label>
+        <select id="distReason" class="inp">
+          <option value="Inserte hazırlık">Inserte hazırlık</option>
+          <option value="Merkez dağılım">Merkez dağılım</option>
+          <option value="Şube dağılım">Şube dağılım</option>
+          <option value="Diğer">Diğer</option>
+        </select>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Insert adı</label>
+          <input id="insertName" class="inp" placeholder="Örn: 14 Şubat" />
+        </div>
+        <div class="field">
+          <label>Insert tarihi (kayan) — ay isim olabilir</label>
+          <div class="wheel" id="w_insert"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>30 gün kala fiyat iste (isteğe bağlı)</label>
+        <select id="price30" class="inp">
+          <option value="0">Hayır</option>
+          <option value="1">Evet (SKT’ye 30 gün kala ana ekranda yeşil yanıp sön)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Not</label>
+        <textarea id="note" placeholder="Ek bilgi..."></textarea>
+      </div>
+
+      <div class="hint" id="flowHint">
+        Akış: Ürün adı → Adet → (Kaydet) → kayıt oluşur. (Modal açıkken Paylaş butonu gizlenir.)
       </div>
     </div>
 
-    <div class="field">
-      <label>Not</label>
-      <textarea id="note" rows="2" placeholder="Ek bilgi..."></textarea>
+    <div class="mActions">
+      <button class="btn ghost" id="btnDelete" style="display:none;">Kaldır</button>
+      <button class="btn" id="btnSave">Kaydet</button>
     </div>
+  </section>
 
-    <div class="field">
-      <label>Uyarı Ayarı (gün)</label>
-      <div class="row">
-        <div class="grow">
-          <label style="margin-top:0">Kırmızı (SKT'ye kaç gün kala)</label>
-          <input id="warnRedDays" inputmode="numeric" placeholder="Örn: 5" />
-        </div>
-        <div class="grow">
-          <label style="margin-top:0">Fiyat iste (kaç gün kala)</label>
-          <input id="priceAskDays" inputmode="numeric" placeholder="Örn: 30" />
-        </div>
-      </div>
-      <div class="meta">SKT geçmiş/gelmiş: kırmızı blink. Fiyat zamanı: yeşil blink.</div>
-    </div>
+  <div id="toast"></div>
 
-  </div>
-  <div class="actions">
-    <button class="btn primary" id="saveAdd">Kaydet</button>
-  </div>
-</section>
-
-<!-- Action Sheet (Edit/Remove) -->
-<section class="modal" id="modalAct">
-  <div class="mhead">
-    <div class="mtitle" id="actTitle">Ürün</div>
-    <div class="spacer"></div>
-    <button class="btn" id="closeAct">Kapat</button>
-  </div>
-  <div class="mbody">
-    <div class="meta" id="actMeta"></div>
-  </div>
-  <div class="actions">
-    <button class="btn" id="actEdit">Düzenle</button>
-    <button class="btn danger" id="actRemove">Kaldır</button>
-  </div>
-</section>
-
-<!-- Remove Modal -->
-<section class="modal" id="modalRem">
-  <div class="mhead">
-    <div class="mtitle">Kaldır</div>
-    <div class="spacer"></div>
-    <button class="btn" id="closeRem">Kapat</button>
-  </div>
-  <div class="mbody">
-    <div class="field">
-      <label>Neden</label>
-      <select id="remReason">
-        <option value="skt">SKT</option>
-        <option value="fabrika">Fabrika kaynaklı</option>
-        <option value="kirik">Kırık / zarar gördü</option>
-        <option value="diger">Diğer</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Not</label>
-      <input id="remNote" placeholder="Örn: koli ezilmiş..." />
-    </div>
-  </div>
-  <div class="actions">
-    <button class="btn primary" id="confirmRem">Onayla</button>
-  </div>
-</section>
-
-<!-- Search Modal -->
-<section class="modal" id="modalSearch">
-  <div class="mhead">
-    <div class="mtitle">Ara</div>
-    <div class="spacer"></div>
-    <button class="btn" id="closeSearch">Kapat</button>
-  </div>
-  <div class="mbody">
-    <div class="field">
-      <label>Ürün ara</label>
-      <input id="q" placeholder="Yaz ve liste filtrelensin..." />
-    </div>
-    <div class="meta">Arama, Tüm Ürünler listesini filtreler.</div>
-  </div>
-</section>
-
-<!-- Date Wheel Sheet -->
-<div id="dwBack"></div>
-<div id="dwSheet" role="dialog" aria-modal="true">
-  <div id="dwHead">
-    <div id="dwTitle">Tarih</div>
-    <div class="spacer"></div>
-    <button id="dwClose" class="btn" type="button">Kapat</button>
-  </div>
-  <div id="dwBody">
-    <div class="dwCol"><select id="dwDay"></select></div>
-    <div class="dwCol"><select id="dwMonth"></select></div>
-    <div class="dwCol"><select id="dwYear"></select></div>
-  </div>
-  <div id="dwActions">
-    <button id="dwToday" class="btn" type="button">Bugün</button>
-    <button id="dwOk" class="btn primary" type="button">Tamam</button>
-  </div>
-</div>
-
-<script src="app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>

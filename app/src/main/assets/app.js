@@ -1,751 +1,657 @@
-(function(){
-  "use strict";
-  const $ = (id)=>document.getElementById(id);
-  const $$ = (sel, p=document)=>Array.from(p.querySelectorAll(sel));
+/* stok_kontrol - offline (localStorage)
+   FIX A: Modal açıkken Paylaş FAB gizlenir + modal scroll/padding ile Kaydet kapanmaz.
+*/
+(() => {
+  const $ = (id) => document.getElementById(id);
 
-  // ---------- Storage ----------
-  const KEY="stok_kontrol_state_v1";
-  const defaultState = ()=>({
-    products: [],   // {id,name, createdAt, warnRedDays, priceAskDays}
-    lots: [],       // {id, productId, qty, skt, supply, siparisVeren, siparisAlan, dagiNeden, insertAdi, insertTarihi, insertDateMode, note, createdAt}
-    removed: [],    // {time, productId, productName, reason, note}
-  });
+  // Elements
+  const screenTitle = $('screenTitle');
+  const listEl = $('list');
+  const chipsEl = $('chips');
 
-  function load(){
+  const btnMenu = $('btnMenu');
+  const drawer = $('drawer');
+  const drawerBackdrop = $('drawerBackdrop');
+  const btnDrawerClose = $('btnDrawerClose');
+  const btnAddFromMenu = $('btnAddFromMenu');
+
+  const btnSearch = $('btnSearch');
+  const searchWrap = $('searchWrap');
+  const q = $('q');
+  const btnClear = $('btnClear');
+
+  const shareFab = $('shareFab');
+  const shareHint = $('shareHint');
+
+  const modalBackdrop = $('modalBackdrop');
+  const modal = $('modal');
+  const modalTitle = $('modalTitle');
+  const btnModalClose = $('btnModalClose');
+
+  const mode = $('mode');
+  const nameInp = $('name');
+  const qtyInp = $('qty');
+  const teminSel = $('temin');
+  const distReasonSel = $('distReason');
+  const insertNameInp = $('insertName');
+  const price30Sel = $('price30');
+  const noteInp = $('note');
+
+  const wSkt = $('w_skt');
+  const wInsert = $('w_insert');
+
+  const btnSave = $('btnSave');
+  const btnDelete = $('btnDelete');
+
+  const toast = $('toast');
+
+  // State
+  let state = {
+    view: 'dashboard',   // dashboard | all | skt10 | removed
+    searchOn: false,
+    query: '',
+    editingId: null
+  };
+
+  const STORE_KEY = 'stok_kontrol_v2_items';
+  const REMOVED_KEY = 'stok_kontrol_v2_removed';
+
+  const today = () => {
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    return d;
+  };
+
+  const toYMD = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const fromYMD = (s) => {
+    const [y,m,d] = s.split('-').map(n => parseInt(n,10));
+    const dt = new Date(y, (m-1), d);
+    dt.setHours(0,0,0,0);
+    return dt;
+  };
+
+  const fmtTR = (ymd) => {
+    const d = fromYMD(ymd);
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const yy = d.getFullYear();
+    return `${dd}.${mm}.${yy}`;
+  };
+
+  const diffDays = (a, b) => {
+    // a-b in days
+    const ms = 24*60*60*1000;
+    return Math.round((a.getTime()-b.getTime())/ms);
+  };
+
+  const load = (key, fallback) => {
     try{
-      const s = JSON.parse(localStorage.getItem(KEY) || "null");
-      if(!s) return defaultState();
-      if(!Array.isArray(s.products)) s.products=[];
-      if(!Array.isArray(s.lots)) s.lots=[];
-      if(!Array.isArray(s.removed)) s.removed=[];
-      return s;
-    }catch(_){ return defaultState(); }
-  }
-  function save(state){ localStorage.setItem(KEY, JSON.stringify(state)); }
+      const raw = localStorage.getItem(key);
+      if(!raw) return fallback;
+      return JSON.parse(raw);
+    }catch(_){ return fallback; }
+  };
 
-  // ---------- Helpers ----------
-  const pad2=(n)=>String(n).padStart(2,"0");
-  const uid=()=>Math.random().toString(16).slice(2)+Date.now().toString(16);
-  function isoToday(){
-    const d=new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-  }
-  function daysUntil(iso){
-    // iso: YYYY-MM-DD
-    const t = new Date(iso+"T00:00:00");
-    const now = new Date(); now.setHours(0,0,0,0);
-    return Math.round((t.getTime()-now.getTime())/86400000);
-  }
-  function fmtIsoTR(iso){
-    // 2026-02-14 -> 14.02.2026
-    const [y,m,d]=iso.split("-"); return `${d}.${m}.${y}`;
+  const save = (key, val) => localStorage.setItem(key, JSON.stringify(val));
+
+  const getItems = () => load(STORE_KEY, []);
+  const setItems = (items) => save(STORE_KEY, items);
+
+  const getRemoved = () => load(REMOVED_KEY, []);
+  const setRemoved = (items) => save(REMOVED_KEY, items);
+
+  const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=> toast.style.display='none', 1800);
   }
 
-  // nearest lot per product: earliest SKT among active lots
-  function nearestLot(state, productId){
-    const lots = state.lots.filter(x=>x.productId===productId);
-    if(!lots.length) return null;
-    lots.sort((a,b)=> (a.skt||"9999-99-99").localeCompare(b.skt||"9999-99-99"));
-    return lots[0];
-  }
+  // Wheel builders
+  function buildWheel(container, { monthNumeric=false }){
+    container.innerHTML = '';
+    const daySel = document.createElement('select');
+    const monSel = document.createElement('select');
+    const yearSel = document.createElement('select');
 
-  // ---------- UI base ----------
-  function openDrawer(){ $("drawerBack").classList.add("show"); $("drawer").classList.add("show"); }
-  function closeDrawer(){ $("drawerBack").classList.remove("show"); $("drawer").classList.remove("show"); }
+    daySel.setAttribute('aria-label','Gün');
+    monSel.setAttribute('aria-label','Ay');
+    yearSel.setAttribute('aria-label','Yıl');
 
-  function openModal(id){
-    $("modalBack").classList.add("show");
-    $(id).classList.add("show");
-  }
-  function closeModal(id){
-    $(id).classList.remove("show");
-    // başka modal açık mı?
-    const anyOpen = $$(".modal").some(m=>m.classList.contains("show"));
-    if(!anyOpen) $("modalBack").classList.remove("show");
-  }
-  function closeAllModals(){
-    $$(".modal").forEach(m=>m.classList.remove("show"));
-    $("modalBack").classList.remove("show");
-  }
-
-  // ---------- Date Wheel ----------
-  // SKT: month MUST be numeric (01-12). We already show numeric in wheel.
-  // For Temin insert: can use wheel or calendar. Wheel shows numeric too (safe).
-  let wheelTarget = null; // {kind:"skt"|"insert", onDone(iso)}
-  function dwFill(){
-    const day=$("dwDay"), mon=$("dwMonth"), yr=$("dwYear");
-    day.innerHTML=""; mon.innerHTML=""; yr.innerHTML="";
     for(let d=1; d<=31; d++){
-      const o=document.createElement("option");
-      o.value=pad2(d); o.textContent=pad2(d);
-      day.appendChild(o);
+      const o=document.createElement('option');
+      o.value=String(d).padStart(2,'0');
+      o.textContent=String(d).padStart(2,'0');
+      daySel.appendChild(o);
     }
-    for(let m=1; m<=12; m++){
-      const o=document.createElement("option");
-      o.value=pad2(m); o.textContent=pad2(m); // NUMARA
-      mon.appendChild(o);
-    }
-    const y0=(new Date()).getFullYear();
-    for(let y=y0-1; y<=y0+6; y++){
-      const o=document.createElement("option");
-      o.value=String(y); o.textContent=String(y);
-      yr.appendChild(o);
-    }
-  }
-  function dwSet(iso){
-    const [y,m,d]=iso.split("-");
-    $("dwYear").value=y;
-    $("dwMonth").value=m;
-    $("dwDay").value=d;
-  }
-  function dwGet(){
-    const y=$("dwYear").value;
-    const m=$("dwMonth").value;
-    let d=$("dwDay").value;
-    // month day clamp
-    const max = new Date(Number(y), Number(m), 0).getDate();
-    if(Number(d) > max) d = pad2(max);
-    return `${y}-${m}-${d}`;
-  }
-  function dwOpen(title, initialIso, onDone){
-    wheelTarget = { onDone };
-    $("dwTitle").textContent = title;
-    $("dwBack").classList.add("show");
-    $("dwSheet").classList.add("show");
-    dwSet(initialIso || isoToday());
-  }
-  function dwClose(){
-    $("dwBack").classList.remove("show");
-    $("dwSheet").classList.remove("show");
-    wheelTarget = null;
-  }
 
-  // ---------- Supply toggles ----------
-  function applySupplyUI(){
-    const v = $("supply").value;
-    $("supplySiparis").style.display = (v==="siparis") ? "block":"none";
-    $("supplyDagi").style.display = (v==="dagi" || v==="merkez") ? "block":"none";
-    // dağılım neden -> insert alanı
-    const n = $("dagiNeden").value;
-    const showInsert = (n==="inserte_hazirlik");
-    $("insertNameWrap").style.display = showInsert ? "block":"none";
-    $("insertDateWrap").style.display = showInsert ? "block":"none";
-  }
-
-  function applyInsertDateMode(){
-    const mode = $("insertDateMode").value;
-    $("insertTarihiCal").style.display = (mode==="calendar") ? "block":"none";
-  }
-
-  // ---------- Rendering ----------
-  let state = load();
-  let filterQ = "";
-  let currentView = "all"; // "all" | "removed"
-  let selectedProductId = null;
-
-  function updatePills(){
-    $("statPill").textContent = `Toplam: ${state.products.length}`;
-    const today = isoToday();
-    const todayRemoved = state.removed.filter(x=> (new Date(x.time)).toISOString().slice(0,10)===today).length;
-    $("todayPill").textContent = `Bugün kaldırılan: ${todayRemoved}`;
-  }
-
-  function buildAlerts(){
-    const wrap = $("homeAlerts");
-    wrap.innerHTML = "";
-
-    // rules:
-    // 1) SKT <= 0 (expired or today) => RED blink, show only name + SKT
-    // 2) priceAskDays rule: if daysUntil(skt) <= priceAskDays AND >=0 => GREEN blink
-    const alerts = [];
-
-    for(const p of state.products){
-      const lot = nearestLot(state, p.id);
-      if(!lot || !lot.skt) continue;
-      const d = daysUntil(lot.skt);
-
-      // red: expired or today (d<=0)
-      if(d <= 0){
-        alerts.push({
-          type:"red",
-          key:`red-${p.id}`,
-          name:p.name,
-          skt:lot.skt,
-          text:`SKT: ${fmtIsoTR(lot.skt)}`
-        });
-        continue;
+    if(monthNumeric){
+      for(let m=1; m<=12; m++){
+        const o=document.createElement('option');
+        o.value=String(m).padStart(2,'0');
+        o.textContent=String(m).padStart(2,'0'); // SKT: numara
+        monSel.appendChild(o);
       }
-
-      const priceAskDays = Number(p.priceAskDays || 0);
-      if(priceAskDays > 0 && d <= priceAskDays){
-        alerts.push({
-          type:"green",
-          key:`green-${p.id}`,
-          name:p.name,
-          skt:lot.skt,
-          text:`Fiyat iste (${d} gün): ${fmtIsoTR(lot.skt)}`
-        });
+    } else {
+      const monthsTR = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+      for(let m=1; m<=12; m++){
+        const o=document.createElement('option');
+        o.value=String(m).padStart(2,'0');
+        o.textContent=monthsTR[m-1]; // Insert/Temin: isim olabilir
+        monSel.appendChild(o);
       }
     }
 
-    if(!alerts.length){
-      const c = document.createElement("div");
-      c.className="card";
-      c.innerHTML = `<div class="name">Şimdilik uyarı yok</div><div class="meta">SKT / fiyat iste uyarısı oluşunca burada görünür.</div>`;
-      wrap.appendChild(c);
-      return;
+    const nowY = new Date().getFullYear();
+    for(let y=nowY-1; y<=nowY+15; y++){
+      const o=document.createElement('option');
+      o.value=String(y);
+      o.textContent=String(y);
+      yearSel.appendChild(o);
     }
 
-    for(const a of alerts){
-      const c = document.createElement("div");
-      c.className = "card";
-      if(a.type==="red") c.classList.add("blink-red");
-      if(a.type==="green") c.classList.add("blink-green");
+    container.appendChild(daySel);
+    container.appendChild(monSel);
+    container.appendChild(yearSel);
 
-      c.innerHTML = `
-        <div class="row">
-          <div class="grow">
-            <div class="name">${escapeHtml(a.name)}</div>
-            <div class="meta">${escapeHtml(a.text)}</div>
-          </div>
-          <div class="badge ${a.type==="red"?"red":"green"}">${a.type==="red"?"SKT":"FİYAT"}</div>
-        </div>
-      `;
-      // click opens action sheet too
-      c.addEventListener("click", ()=>{
-        const pid = state.products.find(x=>x.name===a.name)?.id;
-        if(pid) openActions(pid);
+    function setFromYMD(ymd){
+      const [yy,mm,dd] = ymd.split('-');
+      daySel.value = dd;
+      monSel.value = mm;
+      yearSel.value = yy;
+    }
+    function getYMD(){
+      const yy = yearSel.value;
+      const mm = monSel.value;
+      const dd = daySel.value;
+      return `${yy}-${mm}-${dd}`;
+    }
+
+    // Default today
+    setFromYMD(toYMD(today()));
+
+    return { setFromYMD, getYMD, daySel, monSel, yearSel };
+  }
+
+  const wheelSKT = buildWheel(wSkt, { monthNumeric:true });
+  const wheelINS = buildWheel(wInsert, { monthNumeric:false });
+
+  // Drawer
+  function openDrawer(){
+    drawer.classList.add('open');
+    drawerBackdrop.classList.add('open');
+  }
+  function closeDrawer(){
+    drawer.classList.remove('open');
+    drawerBackdrop.classList.remove('open');
+  }
+
+  // Modal (FIX A here)
+  function openModal(editId=null){
+    state.editingId = editId;
+
+    document.body.classList.add('modal-open'); // <<< FIX A
+    modalBackdrop.style.display = 'block';
+    modal.style.display = 'block';
+
+    if(editId){
+      modalTitle.textContent = 'Düzenle';
+      btnDelete.style.display = 'inline-flex';
+      fillFormForEdit(editId);
+    } else {
+      modalTitle.textContent = 'Ürün / Parti Ekle';
+      btnDelete.style.display = 'none';
+      clearForm();
+    }
+
+    // focus
+    setTimeout(()=> nameInp.focus(), 50);
+  }
+
+  function closeModal(){
+    document.body.classList.remove('modal-open'); // <<< FIX A
+    modalBackdrop.style.display = 'none';
+    modal.style.display = 'none';
+    state.editingId = null;
+  }
+
+  function clearForm(){
+    mode.value = 'new';
+    nameInp.value = '';
+    qtyInp.value = '';
+    teminSel.value = 'Sipariş';
+    distReasonSel.value = 'Inserte hazırlık';
+    insertNameInp.value = '';
+    price30Sel.value = '0';
+    noteInp.value = '';
+    wheelSKT.setFromYMD(toYMD(today()));
+    wheelINS.setFromYMD(toYMD(today()));
+  }
+
+  function fillFormForEdit(id){
+    const items = getItems();
+    const it = items.find(x=>x.id===id);
+    if(!it) return;
+
+    mode.value = 'new';
+    nameInp.value = it.name || '';
+    qtyInp.value = String(it.qty ?? '');
+    teminSel.value = it.temin || 'Sipariş';
+    distReasonSel.value = it.distReason || 'Inserte hazırlık';
+    insertNameInp.value = it.insertName || '';
+    price30Sel.value = it.price30 ? '1' : '0';
+    noteInp.value = it.note || '';
+
+    wheelSKT.setFromYMD(it.skt || toYMD(today()));
+    wheelINS.setFromYMD(it.insertDate || toYMD(today()));
+  }
+
+  // Views / filters
+  function setView(v){
+    state.view = v;
+    state.query = '';
+    q.value = '';
+    render();
+  }
+
+  function filteredItems(){
+    const items = getItems().filter(x => !x.removed);
+    const t = today();
+
+    let arr = items;
+
+    if(state.query.trim()){
+      const s = state.query.trim().toLowerCase();
+      arr = arr.filter(x =>
+        (x.name||'').toLowerCase().includes(s) ||
+        (x.temin||'').toLowerCase().includes(s) ||
+        (x.insertName||'').toLowerCase().includes(s)
+      );
+    }
+
+    if(state.view === 'skt10'){
+      arr = arr.filter(x => {
+        if(!x.skt) return false;
+        const d = fromYMD(x.skt);
+        const left = diffDays(d, t); // d - today
+        return left >= 0 && left <= 10;
+      }).sort((a,b)=> fromYMD(a.skt)-fromYMD(b.skt));
+    } else if(state.view === 'dashboard'){
+      // dashboard: show alerts first (expired + price30)
+      arr = arr.slice().sort((a,b)=>{
+        const aD = a.skt ? diffDays(fromYMD(a.skt), t) : 99999;
+        const bD = b.skt ? diffDays(fromYMD(b.skt), t) : 99999;
+        return aD - bD;
       });
-      wrap.appendChild(c);
+    } else if(state.view === 'all'){
+      arr = arr.slice().sort((a,b)=> (a.name||'').localeCompare(b.name||'', 'tr'));
     }
+
+    return arr;
   }
 
-  function renderAllList(){
-    $("listTitle").textContent = (currentView==="all") ? "Tüm Ürünler" : "Kaldırılanlar";
-    const wrap = $("allList");
-    wrap.innerHTML="";
+  function chipsForView(){
+    const items = getItems().filter(x => !x.removed);
+    const t = today();
 
-    if(currentView==="removed"){
-      if(!state.removed.length){
-        const c=document.createElement("div");
-        c.className="card";
-        c.innerHTML=`<div class="name">Kaldırılan yok</div>`;
-        wrap.appendChild(c);
-        return;
-      }
-      // newest first
-      const arr=[...state.removed].sort((a,b)=>b.time-a.time);
-      for(const r of arr){
-        const c=document.createElement("div");
-        c.className="card";
-        const dt = new Date(r.time);
-        const when = `${pad2(dt.getDate())}.${pad2(dt.getMonth()+1)}.${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
-        c.innerHTML = `
-          <div class="row">
-            <div class="grow">
-              <div class="name">${escapeHtml(r.productName)}</div>
-              <div class="meta">${escapeHtml(when)} • Neden: ${escapeHtml(r.reason)} ${r.note?("• "+escapeHtml(r.note)):""}</div>
-            </div>
-            <div class="badge amber">Kaldırıldı</div>
-          </div>
-        `;
-        wrap.appendChild(c);
-      }
-      return;
-    }
+    const total = items.length;
 
-    // products list
-    let arr = [...state.products];
-    if(filterQ.trim()){
-      const q = filterQ.trim().toLowerCase();
-      arr = arr.filter(p=> p.name.toLowerCase().includes(q));
-    }
-    // sort by nearest skt
-    arr.sort((a,b)=>{
-      const la=nearestLot(state,a.id), lb=nearestLot(state,b.id);
-      const sa=(la?.skt)||"9999-99-99", sb=(lb?.skt)||"9999-99-99";
-      return sa.localeCompare(sb);
-    });
+    const expired = items.filter(x => x.skt && diffDays(fromYMD(x.skt), t) <= 0).length;
+    const near10 = items.filter(x => x.skt && (()=>{
+      const left = diffDays(fromYMD(x.skt), t);
+      return left >=0 && left<=10;
+    })()).length;
+    const price30 = items.filter(x => x.price30 && x.skt && diffDays(fromYMD(x.skt), t) <= 30 && diffDays(fromYMD(x.skt), t) >= 0).length;
 
-    if(!arr.length){
-      const c=document.createElement("div");
-      c.className="card";
-      c.innerHTML=`<div class="name">Liste boş</div><div class="meta">Menüden “+ Ürün / Parti Ekle” ile ekle.</div>`;
-      wrap.appendChild(c);
-      return;
-    }
+    return [
+      { label:'Toplam', val: total },
+      { label:'SKT geçti/bugün', val: expired },
+      { label:'Son 10 gün', val: near10 },
+      { label:'Fiyat(30g)', val: price30 }
+    ];
+  }
 
-    for(const p of arr){
-      const lot = nearestLot(state,p.id);
-      const d = lot?.skt ? daysUntil(lot.skt) : null;
-
-      let badge = `<div class="badge">Normal</div>`;
-      let extraClass = "";
-
-      if(lot?.skt){
-        if(d <= 0){ badge = `<div class="badge red">SKT</div>`; extraClass="blink-red"; }
-        else if(Number(p.priceAskDays||0)>0 && d <= Number(p.priceAskDays)){ badge = `<div class="badge green">FİYAT</div>`; extraClass="blink-green"; }
-        else if(Number(p.warnRedDays||0)>0 && d <= Number(p.warnRedDays)){ badge = `<div class="badge amber">Yakın</div>`; }
-      }
-
-      const meta = lot?.skt
-        ? `SKT: ${fmtIsoTR(lot.skt)} • Adet: ${lot.qty}`
-        : `Parti yok`;
-
-      const c=document.createElement("div");
-      c.className="card";
-      if(extraClass) c.classList.add(extraClass);
-      c.innerHTML = `
-        <div class="row">
-          <div class="grow">
-            <div class="name">${escapeHtml(p.name)}</div>
-            <div class="meta">${escapeHtml(meta)}</div>
-          </div>
-          ${badge}
-        </div>
-      `;
-      c.addEventListener("click", ()=> openActions(p.id));
-      wrap.appendChild(c);
-    }
+  function screenLabel(){
+    if(state.view==='dashboard') return 'Ana';
+    if(state.view==='all') return 'Tüm Ürünler';
+    if(state.view==='skt10') return 'SKT: Son 10 Gün';
+    if(state.view==='removed') return 'Kaldırılanlar';
+    return 'Ekran';
   }
 
   function render(){
-    updatePills();
-    buildAlerts();
-    renderAllList();
-  }
+    const label = screenLabel();
+    screenTitle.textContent = `Ekran: ${label}`;
+    shareHint.textContent = label;
 
-  // ---------- Actions: Edit/Remove ----------
-  function openActions(pid){
-    selectedProductId = pid;
-    const p = state.products.find(x=>x.id===pid);
-    const lot = nearestLot(state, pid);
-    $("actTitle").textContent = p?.name || "Ürün";
-    $("actMeta").textContent = lot?.skt ? `SKT: ${fmtIsoTR(lot.skt)} • Adet: ${lot.qty}` : "Parti yok";
-    openModal("modalAct");
-  }
-
-  function openEdit(pid){
-    const p = state.products.find(x=>x.id===pid);
-    if(!p) return;
-
-    // edit uses same modalAdd
-    $("addTitle").textContent = "Düzenle";
-    $("pName").value = p.name;
-    $("qty").value = String(nearestLot(state,p.id)?.qty || "");
-    $("warnRedDays").value = p.warnRedDays ? String(p.warnRedDays) : "";
-    $("priceAskDays").value = p.priceAskDays ? String(p.priceAskDays) : "";
-    $("note").value = nearestLot(state,p.id)?.note || "";
-
-    // supply fields from nearest lot (best effort)
-    const lot = nearestLot(state,p.id);
-    $("supply").value = lot?.supply || "siparis";
-    $("siparisVeren").value = lot?.siparisVeren || "";
-    $("siparisAlan").value = lot?.siparisAlan || "";
-    $("dagiNeden").value = lot?.dagiNeden || "iskonto";
-    $("insertAdi").value = lot?.insertAdi || "";
-    $("insertDateMode").value = lot?.insertDateMode || "wheel";
-    $("insertTarihiWheel").value = lot?.insertTarihi || "";
-    $("insertTarihiCal").value = lot?.insertTarihi || "";
-    $("insertPreview").textContent = lot?.insertTarihi ? `Insert: ${fmtIsoTR(lot.insertTarihi)}` : "Insert: seçilmedi";
-
-    applySupplyUI();
-    applyInsertDateMode();
-
-    // store edit target on modal
-    $("modalAdd").dataset.editing = pid;
-    // show SKT preview from nearest lot
-    if(lot?.skt){
-      $("skt").value = lot.skt;
-      $("sktPreview").textContent = `SKT: ${fmtIsoTR(lot.skt)}`;
-    }else{
-      $("skt").value = "";
-      $("sktPreview").textContent = `SKT: seçilmedi`;
+    // chips
+    chipsEl.innerHTML = '';
+    const chips = chipsForView();
+    for(const c of chips){
+      const el = document.createElement('div');
+      el.className = 'chip';
+      el.innerHTML = `<strong>${c.val}</strong> ${c.label}`;
+      chipsEl.appendChild(el);
     }
 
-    closeModal("modalAct");
-    openModal("modalAdd");
-    setTimeout(()=>{ try{$("pName").focus(); $("pName").select?.();}catch(_){ } }, 80);
-  }
-
-  function openRemove(pid){
-    selectedProductId = pid;
-    $("remReason").value = "skt";
-    $("remNote").value = "";
-    closeModal("modalAct");
-    openModal("modalRem");
-  }
-
-  // ---------- Add / Save flow ----------
-  function resetAddForm(){
-    $("modalAdd").dataset.editing = "";
-    $("addTitle").textContent = "Ürün / Parti";
-    $("pName").value="";
-    $("qty").value="";
-    $("skt").value="";
-    $("sktPreview").textContent="SKT: seçilmedi";
-    $("supply").value="siparis";
-    $("siparisVeren").value="";
-    $("siparisAlan").value="";
-    $("dagiNeden").value="iskonto";
-    $("insertAdi").value="";
-    $("insertDateMode").value="wheel";
-    $("insertTarihiWheel").value="";
-    $("insertTarihiCal").value="";
-    $("insertPreview").textContent="Insert: seçilmedi";
-    $("note").value="";
-    $("warnRedDays").value="";
-    $("priceAskDays").value="";
-    applySupplyUI();
-    applyInsertDateMode();
-  }
-
-  async function saveAddClick(){
-    const name = ($("pName").value||"").trim();
-    const qty = Number(($("qty").value||"").trim());
-    if(!name){ toast("İsim lazım"); $("pName").focus(); return; }
-    if(!Number.isFinite(qty) || qty<=0){ toast("Adet doğru değil"); $("qty").focus(); return; }
-
-    // SKT wheel: senin istediğin gibi — ekranda sabit değil; Kaydet deyince pat diye açılır
-    let currentSkt = ($("skt").value||"").trim();
-    if(!currentSkt){
-      dwOpen("SKT seç (AY=01-12)", isoToday(), (iso)=>{
-        $("skt").value = iso;
-        $("sktPreview").textContent = `SKT: ${fmtIsoTR(iso)}`;
-        dwClose();
-        // seçer seçmez kaydı tamamla
-        finalizeSave(name, qty, iso);
-      });
+    // list
+    listEl.innerHTML = '';
+    if(state.view === 'removed'){
+      renderRemoved();
       return;
     }
 
-    finalizeSave(name, qty, currentSkt);
-  }
-
-  function finalizeSave(name, qty, sktIso){
-    const editing = ($("modalAdd").dataset.editing||"").trim();
-    const supply = $("supply").value;
-    const siparisVeren = ($("siparisVeren").value||"").trim();
-    const siparisAlan = ($("siparisAlan").value||"").trim();
-    const dagiNeden = $("dagiNeden").value;
-    const insertAdi = ($("insertAdi").value||"").trim();
-    const insertDateMode = $("insertDateMode").value;
-    let insertTarihi = "";
-    if(dagiNeden==="inserte_hazirlik"){
-      if(insertDateMode==="calendar"){
-        insertTarihi = ($("insertTarihiCal").value||"").trim();
-      }else{
-        insertTarihi = ($("insertTarihiWheel").value||"").trim();
-      }
-    }
-    const note = ($("note").value||"").trim();
-
-    const warnRedDays = Number(($("warnRedDays").value||"").trim()||0);
-    const priceAskDays = Number(($("priceAskDays").value||"").trim()||0);
-
-    // product record
-    let pid = editing || null;
-    if(!pid){
-      pid = uid();
-      state.products.push({
-        id: pid,
-        name,
-        createdAt: Date.now(),
-        warnRedDays: warnRedDays>0 ? warnRedDays : 0,
-        priceAskDays: priceAskDays>0 ? priceAskDays : 0
-      });
-    }else{
-      const p = state.products.find(x=>x.id===pid);
-      if(p){
-        p.name = name;
-        p.warnRedDays = warnRedDays>0 ? warnRedDays : 0;
-        p.priceAskDays = priceAskDays>0 ? priceAskDays : 0;
-      }
-      // eski lotları temizle (basit yaklaşım: nearest lot update)
-      // burada: o ürünün ilk lotunu güncelleyelim, yoksa ekleyelim
+    const arr = filteredItems();
+    if(arr.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'card';
+      empty.innerHTML = `<div class="name">Liste boş</div><div class="hint">Menüden “Ürün / Parti Ekle” ile kayıt gir.</div>`;
+      listEl.appendChild(empty);
+      return;
     }
 
-    // lot
-    const existingLot = state.lots.find(x=>x.productId===pid);
-    if(existingLot){
-      existingLot.qty = qty;
-      existingLot.skt = sktIso;
-      existingLot.supply = supply;
-      existingLot.siparisVeren = siparisVeren;
-      existingLot.siparisAlan = siparisAlan;
-      existingLot.dagiNeden = dagiNeden;
-      existingLot.insertAdi = insertAdi;
-      existingLot.insertTarihi = insertTarihi;
-      existingLot.insertDateMode = insertDateMode;
-      existingLot.note = note;
-    }else{
-      state.lots.push({
-        id: uid(),
-        productId: pid,
-        qty,
-        skt: sktIso,
-        supply,
-        siparisVeren,
-        siparisAlan,
-        dagiNeden,
-        insertAdi,
-        insertTarihi,
-        insertDateMode,
-        note,
-        createdAt: Date.now()
-      });
-    }
+    const frag = document.createDocumentFragment();
+    const t = today();
 
-    save(state);
-    render();
-    toast(editing ? "Güncellendi" : "Kaydedildi");
+    for(const it of arr){
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = it.id;
 
-    // senin istediğin “akış”: isim boşalsın, imleç oraya dönsün
-    resetAddForm();
-    setTimeout(()=>{ try{$("pName").focus();}catch(_){ } }, 80);
-  }
+      // alert styles
+      let blinkClass = '';
+      let tags = [];
 
-  // Insert tarihi wheel aç (temin kısmı için wheel/takvim ikisi de var)
-  function pickInsertWheel(){
-    const cur = ($("insertTarihiWheel").value||"").trim() || isoToday();
-    dwOpen("Insert tarihi (AY=01-12)", cur, (iso)=>{
-      $("insertTarihiWheel").value = iso;
-      $("insertPreview").textContent = `Insert: ${fmtIsoTR(iso)}`;
-      dwClose();
-    });
-  }
+      if(it.skt){
+        const left = diffDays(fromYMD(it.skt), t);
+        if(left <= 0){
+          blinkClass = 'blink-red'; // SKT geldi/geçti
+          tags.push(`<span class="tag red">SKT: ${fmtTR(it.skt)}</span>`);
+        } else if(left <= 10){
+          tags.push(`<span class="tag dark">SKT: ${fmtTR(it.skt)} (${left}g)</span>`);
+        } else {
+          tags.push(`<span class="tag">SKT: ${fmtTR(it.skt)}</span>`);
+        }
 
-  // ---------- Remove ----------
-  function confirmRemove(){
-    const pid = selectedProductId;
-    const p = state.products.find(x=>x.id===pid);
-    if(!p){ closeModal("modalRem"); return; }
-    const reason = $("remReason").value;
-    const note = ($("remNote").value||"").trim();
-
-    // remove product + lots
-    state.products = state.products.filter(x=>x.id!==pid);
-    state.lots = state.lots.filter(x=>x.productId!==pid);
-    state.removed.push({ time: Date.now(), productId: pid, productName: p.name, reason, note });
-
-    save(state);
-    render();
-    closeModal("modalRem");
-    toast("Kaldırıldı");
-    selectedProductId = null;
-  }
-
-  // ---------- Backup / Restore ----------
-  function doBackup(){
-    try{
-      const blob = new Blob([localStorage.getItem(KEY)||""], {type:"application/json"});
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "stok_kontrol_yedek.json";
-      a.click();
-      toast("Yedek indirildi");
-    }catch(_){ toast("Yedek başarısız"); }
-  }
-  function doRestore(){
-    const inp = document.createElement("input");
-    inp.type="file";
-    inp.accept="application/json";
-    inp.onchange = async ()=>{
-      const f = inp.files && inp.files[0];
-      if(!f) return;
-      const txt = await f.text();
-      try{
-        JSON.parse(txt);
-        localStorage.setItem(KEY, txt);
-        state = load();
-        render();
-        toast("Geri yüklendi");
-      }catch(_){ toast("Dosya bozuk"); }
-    };
-    inp.click();
-  }
-
-  // ---------- Share ----------
-  function visibleSection(){
-    // hangi bölüm daha görünür? (alerts mi list mi)
-    const a = $("homeAlerts").getBoundingClientRect();
-    const l = $("allList").getBoundingClientRect();
-    const vh = window.innerHeight || 800;
-    const visA = Math.max(0, Math.min(a.bottom, vh) - Math.max(a.top, 0));
-    const visL = Math.max(0, Math.min(l.bottom, vh) - Math.max(l.top, 0));
-    return (visA >= visL) ? "alerts" : "list";
-  }
-
-  function shareText(){
-    if(currentView==="removed"){
-      const arr=[...state.removed].sort((a,b)=>b.time-a.time).slice(0,20);
-      return "Kaldırılanlar:\n" + arr.map(r=>{
-        const dt = new Date(r.time);
-        const when = `${pad2(dt.getDate())}.${pad2(dt.getMonth()+1)}.${dt.getFullYear()}`;
-        return `- ${r.productName} • ${when} • ${r.reason}${r.note?(" • "+r.note):""}`;
-      }).join("\n");
-    }
-
-    const vs = visibleSection();
-    if(vs==="alerts"){
-      // build current alerts text
-      const lines=[];
-      for(const p of state.products){
-        const lot = nearestLot(state,p.id);
-        if(!lot?.skt) continue;
-        const d=daysUntil(lot.skt);
-        if(d<=0){
-          lines.push(`- [SKT] ${p.name} • ${fmtIsoTR(lot.skt)}`);
-        }else if(Number(p.priceAskDays||0)>0 && d<=Number(p.priceAskDays)){
-          lines.push(`- [FİYAT] ${p.name} • ${d} gün • ${fmtIsoTR(lot.skt)}`);
+        if(it.price30 && left <= 30 && left >= 0){
+          blinkClass = blinkClass || 'blink-green';
+          tags.push(`<span class="tag green">Fiyat iste: ${left}g</span>`);
         }
       }
-      return lines.length ? ("Ana Uyarılar:\n"+lines.join("\n")) : "Ana Uyarılar: yok";
-    }
 
-    // list share
-    let arr=[...state.products];
-    if(filterQ.trim()){
-      const q=filterQ.trim().toLowerCase();
-      arr=arr.filter(p=>p.name.toLowerCase().includes(q));
+      if(it.temin){
+        tags.push(`<span class="tag">Temin: ${it.temin}</span>`);
+      }
+      if(it.temin === 'Dağılım'){
+        tags.push(`<span class="tag">Dağılım/Insert</span>`);
+        if(it.insertName) tags.push(`<span class="tag">Insert: ${escapeHtml(it.insertName)}</span>`);
+        if(it.insertDate) tags.push(`<span class="tag">Tarih: ${fmtTR(it.insertDate)}</span>`);
+      }
+
+      card.classList.add(blinkClass);
+
+      card.innerHTML = `
+        <div class="cardTop">
+          <div>
+            <div class="name">${escapeHtml(it.name || '(İsimsiz)')}</div>
+          </div>
+          <div class="qty">${Number(it.qty||0)} adet</div>
+        </div>
+        <div class="meta">${tags.join('')}</div>
+        <div class="actionsRow">
+          <button class="btn ghost" data-act="edit">Düzenle</button>
+          <button class="btn ghost" data-act="remove">Kaldır</button>
+        </div>
+      `;
+
+      frag.appendChild(card);
     }
-    arr=arr.slice(0,40);
-    return "Ürün Listesi:\n" + arr.map(p=>{
-      const lot=nearestLot(state,p.id);
-      return `- ${p.name}${lot?.skt?(" • SKT "+fmtIsoTR(lot.skt)):""}`;
-    }).join("\n");
+    listEl.appendChild(frag);
   }
 
-  async function doShare(){
-    const text = shareText();
+  function renderRemoved(){
+    const arr = getRemoved().slice().reverse();
+    if(arr.length===0){
+      const empty = document.createElement('div');
+      empty.className = 'card';
+      empty.innerHTML = `<div class="name">Kaldırılan yok</div><div class="hint">Kaldırdıkların burada görünür.</div>`;
+      listEl.appendChild(empty);
+      return;
+    }
+
+    const frag=document.createDocumentFragment();
+    for(const it of arr){
+      const card=document.createElement('div');
+      card.className='card';
+      card.innerHTML = `
+        <div class="cardTop">
+          <div>
+            <div class="name">${escapeHtml(it.name||'(İsimsiz)')}</div>
+            <div class="hint">Kaldırma nedeni: <b>${escapeHtml(it.removeReason||'-')}</b> • ${it.removedAt ? fmtTR(it.removedAt) : ''}</div>
+          </div>
+          <div class="qty">${Number(it.qty||0)} adet</div>
+        </div>
+        <div class="meta">
+          ${it.skt ? `<span class="tag">SKT: ${fmtTR(it.skt)}</span>` : ''}
+          ${it.note ? `<span class="tag">Not: ${escapeHtml(it.note)}</span>` : ''}
+        </div>
+      `;
+      frag.appendChild(card);
+    }
+    listEl.appendChild(frag);
+  }
+
+  // Share
+  async function shareCurrent(){
+    const label = screenLabel();
+    let text = `stok_kontrol • ${label}\n`;
+
+    if(state.view==='removed'){
+      const arr = getRemoved().slice().reverse().slice(0, 60);
+      for(const it of arr){
+        text += `• ${it.name} — ${it.qty} adet — Neden: ${it.removeReason || '-'}\n`;
+      }
+    } else {
+      const arr = filteredItems().slice(0, 80);
+      for(const it of arr){
+        let line = `• ${it.name} — ${it.qty} adet`;
+        if(it.skt) line += ` — SKT: ${fmtTR(it.skt)}`;
+        if(it.temin) line += ` — ${it.temin}`;
+        if(it.temin==='Dağılım' && it.insertName) line += ` — Insert: ${it.insertName}`;
+        text += line + '\n';
+      }
+    }
+
     try{
       if(navigator.share){
-        await navigator.share({ text, title:"Stok Kontrol" });
-      }else{
+        await navigator.share({ text });
+      } else {
         await navigator.clipboard.writeText(text);
-        toast("Paylaşım metni kopyalandı");
+        showToast('Paylaşım metni kopyalandı');
       }
     }catch(_){
-      try{ await navigator.clipboard.writeText(text); toast("Kopyalandı"); }catch(__){ toast("Paylaşım olmadı"); }
+      // fallback
+      try{
+        await navigator.clipboard.writeText(text);
+        showToast('Paylaşım metni kopyalandı');
+      }catch(__){
+        alert(text);
+      }
     }
   }
 
-  // ---------- Toast ----------
-  let toastT = null;
-  function toast(msg){
-    clearTimeout(toastT);
-    // mini toast: title pill’lerin yanına basit
-    const el = document.createElement("div");
-    el.style.position="fixed";
-    el.style.left="12px";
-    el.style.right="12px";
-    el.style.bottom="76px";
-    el.style.zIndex="999";
-    el.style.background="rgba(17,24,39,.88)";
-    el.style.color="#fff";
-    el.style.padding="10px 12px";
-    el.style.borderRadius="14px";
-    el.style.fontWeight="900";
-    el.style.textAlign="center";
-    el.style.backdropFilter="blur(6px)";
-    el.textContent=msg;
-    document.body.appendChild(el);
-    toastT=setTimeout(()=>{ try{el.remove();}catch(_){ } }, 1200);
-  }
+  // CRUD
+  function upsertItem(){
+    const nm = nameInp.value.trim();
+    const qty = parseInt(qtyInp.value.trim() || '0', 10);
 
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, (c)=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-  }
+    if(!nm){
+      showToast('Ürün adı gerekli');
+      nameInp.focus();
+      return;
+    }
+    if(!Number.isFinite(qty) || qty < 0){
+      showToast('Adet sayısı geçersiz');
+      qtyInp.focus();
+      return;
+    }
 
-  // ---------- Events ----------
-  function bind(){
-    // drawer
-    $("menuBtn").onclick=openDrawer;
-    $("drawerBack").onclick=closeDrawer;
-
-    $("navAdd").onclick=()=>{ closeDrawer(); resetAddForm(); openModal("modalAdd"); setTimeout(()=>{$("pName").focus();},80); };
-    $("navHome").onclick=()=>{ closeDrawer(); currentView="all"; render(); };
-    $("navRemoved").onclick=()=>{ closeDrawer(); currentView="removed"; render(); };
-    $("navBackup").onclick=()=>{ closeDrawer(); doBackup(); };
-    $("navRestore").onclick=()=>{ closeDrawer(); doRestore(); };
-
-    // modals
-    $("modalBack").onclick=closeAllModals;
-    $("closeAdd").onclick=()=>closeModal("modalAdd");
-    $("closeAct").onclick=()=>closeModal("modalAct");
-    $("closeRem").onclick=()=>closeModal("modalRem");
-    $("closeSearch").onclick=()=>closeModal("modalSearch");
-
-    // search
-    $("searchBtn").onclick=()=>{ openModal("modalSearch"); setTimeout(()=>{$("q").focus();},80); };
-    $("q").addEventListener("input", ()=>{
-      filterQ = $("q").value||"";
-      render();
-    });
-
-    // share
-    $("shareFab").onclick=doShare;
-
-    // action sheet
-    $("actEdit").onclick=()=>openEdit(selectedProductId);
-    $("actRemove").onclick=()=>openRemove(selectedProductId);
-
-    // remove
-    $("confirmRem").onclick=confirmRemove;
-
-    // add save
-    $("saveAdd").onclick=saveAddClick;
-
-    // supply changes
-    $("supply").addEventListener("change", applySupplyUI);
-    $("dagiNeden").addEventListener("change", applySupplyUI);
-    $("insertDateMode").addEventListener("change", applyInsertDateMode);
-
-    // insert date pickers
-    $("insertTarihiCal").addEventListener("change", ()=>{
-      const v=$("insertTarihiCal").value||"";
-      $("insertPreview").textContent = v ? `Insert: ${fmtIsoTR(v)}` : "Insert: seçilmedi";
-    });
-
-    // “inserte hazırlık” seçilince wheel modundaysa preview’a tıklayınca wheel aç
-    $("insertPreview").addEventListener("click", ()=>{
-      const need = ($("dagiNeden").value==="inserte_hazirlik");
-      if(!need) return;
-      const mode = $("insertDateMode").value;
-      if(mode==="wheel") pickInsertWheel();
-      else $("insertTarihiCal").showPicker?.();
-    });
-
-    // wheel buttons
-    $("dwBack").onclick=dwClose;
-    $("dwClose").onclick=dwClose;
-    $("dwToday").onclick=()=>dwSet(isoToday());
-    $("dwOk").onclick=()=>{
-      const iso = dwGet();
-      if(wheelTarget?.onDone) wheelTarget.onDone(iso);
-      // dwClose() wheelTarget.onDone çağıran yerde kapatılıyor (SKT akışında)
-      if(wheelTarget) dwClose();
+    const it = {
+      id: state.editingId || uid(),
+      name: nm,
+      qty,
+      skt: wheelSKT.getYMD(),
+      temin: teminSel.value,
+      distReason: distReasonSel.value,
+      insertName: insertNameInp.value.trim(),
+      insertDate: wheelINS.getYMD(),
+      price30: price30Sel.value === '1',
+      note: noteInp.value.trim(),
+      updatedAt: toYMD(today())
     };
 
-    // wheel fill once
-    dwFill();
+    const items = getItems();
+    const idx = items.findIndex(x => x.id === it.id);
 
-    // Enter flow: name -> qty -> Save
-    $("pName").addEventListener("keydown",(e)=>{
-      if(e.key==="Enter"){ e.preventDefault(); $("qty").focus(); }
-    });
-    $("qty").addEventListener("keydown",(e)=>{
-      if(e.key==="Enter"){ e.preventDefault(); $("saveAdd").click(); }
-    });
+    if(idx >= 0){
+      items[idx] = { ...items[idx], ...it };
+      setItems(items);
+      showToast('Güncellendi');
+    }else{
+      items.push(it);
+      setItems(items);
+      showToast('Kaydedildi');
+    }
+
+    closeModal();
+    render();
   }
 
-  // init
-  document.addEventListener("DOMContentLoaded", ()=>{
-    state = load();
-    // supply ui defaults
-    applySupplyUI();
-    applyInsertDateMode();
+  function askRemove(id){
+    const items = getItems();
+    const it = items.find(x=>x.id===id);
+    if(!it) return;
+
+    // mini reason picker (prompt)
+    const reason = prompt(
+`Kaldırma nedeni yaz:
+- skt
+- fabrika kaynaklı
+- kırık, zarar gördü
+- diğer`
+    );
+
+    if(reason === null) return; // cancel
+
+    const cleaned = reason.trim() || 'diğer';
+
+    // remove from active
+    const next = items.filter(x=>x.id!==id);
+    setItems(next);
+
+    // push to removed
+    const rem = getRemoved();
+    rem.push({
+      ...it,
+      removeReason: cleaned,
+      removedAt: toYMD(today())
+    });
+    setRemoved(rem);
+
+    showToast('Kaldırıldı');
     render();
-    bind();
+  }
+
+  // Helpers
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, (c)=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
+  }
+
+  // Events
+  btnMenu.addEventListener('click', openDrawer);
+  btnDrawerClose.addEventListener('click', closeDrawer);
+  drawerBackdrop.addEventListener('click', closeDrawer);
+
+  drawer.addEventListener('click', (e)=>{
+    const b = e.target.closest('button[data-nav]');
+    if(!b) return;
+    closeDrawer();
+    setView(b.dataset.nav);
   });
 
+  btnAddFromMenu.addEventListener('click', ()=>{
+    closeDrawer();
+    openModal(null);
+  });
+
+  btnSearch.addEventListener('click', ()=>{
+    state.searchOn = !state.searchOn;
+    searchWrap.style.display = state.searchOn ? 'flex' : 'none';
+    if(state.searchOn) setTimeout(()=>q.focus(), 50);
+    else { state.query=''; q.value=''; render(); }
+  });
+
+  q.addEventListener('input', ()=>{
+    state.query = q.value;
+    render();
+  });
+
+  btnClear.addEventListener('click', ()=>{
+    state.query='';
+    q.value='';
+    render();
+  });
+
+  shareFab.addEventListener('click', shareCurrent);
+
+  btnModalClose.addEventListener('click', closeModal);
+  modalBackdrop.addEventListener('click', closeModal);
+
+  btnSave.addEventListener('click', upsertItem);
+
+  btnDelete.addEventListener('click', ()=>{
+    if(!state.editingId) return;
+    askRemove(state.editingId);
+    closeModal();
+  });
+
+  // card actions
+  listEl.addEventListener('click', (e)=>{
+    const actBtn = e.target.closest('button[data-act]');
+    if(!actBtn) return;
+    const card = e.target.closest('.card');
+    if(!card) return;
+    const id = card.dataset.id;
+    const act = actBtn.dataset.act;
+
+    if(act==='edit') openModal(id);
+    if(act==='remove') askRemove(id);
+  });
+
+  // Enter flow: name -> qty -> save
+  nameInp.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'){
+      e.preventDefault();
+      qtyInp.focus();
+    }
+  });
+  qtyInp.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'){
+      e.preventDefault();
+      btnSave.click();
+    }
+  });
+
+  // Boot
+  setView('dashboard');
 })();
