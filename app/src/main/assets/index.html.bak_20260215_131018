@@ -42,7 +42,7 @@
     @keyframes blinkRed{0%,49%{outline:2px solid transparent}50%,100%{outline:2px solid rgba(185,28,28,.85)}}
     @keyframes blinkGreen{0%,49%{outline:2px solid transparent}50%,100%{outline:2px solid rgba(21,128,61,.85)}}
 
-    /* FAB paylaş: her zaman sağ altta (modal açıkken JS gizler) */
+    /* FAB paylaş: her zaman sağ altta (modal açıkken gizlenecek) */
     .shareFab{
       position:fixed;right:16px;bottom:18px;z-index:50;
       border:0;border-radius:18px;padding:14px 16px;
@@ -121,12 +121,12 @@
   </div>
 
   <section>
-    <h3>Kritik (SKT eşiği)</h3>
+    <h3>Kritik (SKT geldi)</h3>
     <div id="criticalList" class="grid"></div>
   </section>
 
   <section style="margin-top:14px">
-    <h3>Fiyat zamanı (son X gün)</h3>
+    <h3>Fiyat zamanı (son 30 gün)</h3>
     <div id="priceList" class="grid"></div>
   </section>
 
@@ -156,7 +156,6 @@
       <label>Ürün Adı</label>
       <input id="pName" placeholder="Örn: Danet sucuk" />
     </div>
-
     <div class="field">
       <label>Adet</label>
       <input id="qty" inputmode="numeric" placeholder="Örn: 12" />
@@ -189,7 +188,7 @@
         <input id="insertName" placeholder="Örn: 14 Şubat" />
       </div>
       <div class="field" id="insertDateWrap" style="display:none">
-        <label>Insert Tarihi (serbest)</label>
+        <label>Insert Tarihi (serbest / takvim yazısı)</label>
         <input id="insertDateText" placeholder="Örn: 14-25 / 02" />
       </div>
     </div>
@@ -204,15 +203,13 @@
       <input id="priceDays" inputmode="numeric" placeholder="Örn: 30" />
     </div>
 
-    <div class="field">
-      <label>SKT gün eşiği (kritik) — örn 0 / 5 / 10</label>
-      <input id="criticalDays" inputmode="numeric" placeholder="Örn: 0 = SKT günü, 5 = 5 gün kala" />
-    </div>
+      <div class="field">
+        <label>SKT gün eşiği (kaldırılmalı) — örn 5 / 10</label>
+        <input id="criticalDays" inputmode="numeric" placeholder="Örn: 0 = SKT günü, 5 = 5 gün kala" />
+      </div>
 
-    <!-- SKT görünmez: Kaydet'te wheel açılır -->
     <input id="skt" type="hidden" />
   </div>
-
   <div class="mFoot">
     <button id="saveAdd" class="btn btnPrimary">Kaydet</button>
   </div>
@@ -254,7 +251,6 @@
   </div>
 </section>
 
-<!-- Wheel -->
 <div id="dwBack"></div>
 <div id="dwSheet" role="dialog" aria-modal="true">
   <div id="dwHead">

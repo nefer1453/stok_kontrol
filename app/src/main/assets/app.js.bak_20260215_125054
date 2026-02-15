@@ -1,7 +1,7 @@
 (function(){
   "use strict";
   const $ = (id)=>document.getElementById(id);
-  const LS_KEY = "stok_kontrol_state_v4";
+  const LS_KEY = "stok_kontrol_state_v3";
 
   const pad2 = (n)=>String(n).padStart(2,"0");
   const iso = (y,m,d)=>`${y}-${pad2(m)}-${pad2(d)}`;
@@ -10,7 +10,7 @@
     if(!m) return null;
     return {y:+m[1], mo:+m[2], d:+m[3]};
   };
-  const today0 = ()=>{
+  const today = ()=>{
     const t=new Date(); t.setHours(0,0,0,0);
     return t;
   };
@@ -18,7 +18,7 @@
     const p=parseISO(isoDate);
     if(!p) return 99999;
     const a=new Date(p.y, p.mo-1, p.d); a.setHours(0,0,0,0);
-    return Math.round((a - today0())/86400000);
+    return Math.round((a - today())/86400000);
   };
   const esc = (s)=>String(s||"").replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 
@@ -36,6 +36,7 @@
   let state = load();
   let selectedId = null;
   let editId = null;
+  let currentShareMode = "all"; // all | critical | price
 
   // Drawer
   function openDrawer(){ $("drawerBack").classList.add("show"); $("drawer").classList.add("show"); }
@@ -63,11 +64,11 @@
     $("shareFab").style.display = "";
   }
 
-  // Wheel (ay = numara)
+  // Wheel
   function ensureWheel(){
     const day=$("dwDay"), mo=$("dwMonth"), yr=$("dwYear");
     if(day.options.length===0) for(let i=1;i<=31;i++) day.add(new Option(String(i), String(i)));
-    if(mo.options.length===0) for(let i=1;i<=12;i++) mo.add(new Option(String(i), String(i)));
+    if(mo.options.length===0) for(let i=1;i<=12;i++) mo.add(new Option(String(i), String(i))); // AY NUMARA
     if(yr.options.length===0){
       const t=new Date().getFullYear();
       for(let y=t-1;y<=t+6;y++) yr.add(new Option(String(y), String(y)));
@@ -92,7 +93,7 @@
     return iso(y,m,d);
   }
 
-  // küçük toast
+  // UI
   function toast(msg){
     const old=document.title;
     document.title=msg;
@@ -120,7 +121,7 @@
     $("insertDateText").value = p?.insertDateText || "";
     $("note").value = p?.note || "";
     $("priceDays").value = (p?.priceDays ?? "30");
-    $("criticalDays").value = (p?.criticalDays ?? "0");
+      10475 3003 9997 20475 50475 99909997"criticalDays").value = (p?.criticalDays ?? "0");
     $("skt").value = p?.skt || "";
     refreshSupplyUI();
   }
@@ -171,81 +172,86 @@
     return arr;
   }
 
-  function isCritical(p){
+  function cardHTML(p){
     const d=daysUntil(p.skt);
-    const cd = Number(p.criticalDays ?? 0);
-    // cd: 0 => SKT günü kritik, 5 => 5 gün kala kritik, geçmiş (negatif) zaten kritik
-    return d <= cd;
-  }
-
-  function isPriceHit(p){
-    const d=daysUntil(p.skt);
+    const critical = d < 0;
     const pd = Number(p.priceDays||0);
-    return pd>0 && d<=pd && d>=0;
-  }
-
-  function cardHTML(p, mode){
-    const d=daysUntil(p.skt);
-    const critical = isCritical(p);
-    const priceHit = isPriceHit(p);
+    const priceHit = pd>0 && d<=pd && d>=0;
 
     let cls="card";
     if(critical) cls+=" blinkRed";
     else if(priceHit) cls+=" blinkGreen";
 
     const tag = (d===99999) ? "-" : (d<0 ? "GEÇTİ" : (d+"g"));
-
-    // Kritik listede: sadece isim + tarih (senin dediğin gibi “sade”)
-    const sub = (mode==="critical")
-      ? `SKT: ${esc(p.skt||"-")}`
-      : `Adet: ${p.qty||0} • SKT: ${esc(p.skt||"-")} • Temin: ${esc(p.supply||"-")}`;
-
     return `
       <div class="${cls}" data-id="${p.id}">
         <div class="row">
           <div class="title">${esc(p.name)}</div>
           <div class="tag">${tag}</div>
         </div>
-        <div class="sub">${sub}</div>
+        <div class="sub">Adet: ${p.qty||0} • SKT: ${esc(p.skt||"-")} • Temin: ${esc(p.supply||"-")}</div>
       </div>
     `;
   }
 
   function render(){
     const arr=getFiltered();
-
-    const critical=arr.filter(isCritical);
-    const price=arr.filter(isPriceHit);
+    const critical=arr.filter(p=>daysUntil(p.skt) < 0);
+    const price=arr.filter(p=>{
+      const d=daysUntil(p.skt);
+      const pd=Number(p.priceDays||0);
+      return pd>0 && d<=pd && d>=0;
+    });
 
     $("pillCritical").textContent="Kritik: "+critical.length;
     $("pillPrice").textContent="Fiyat: "+price.length;
     $("pillAll").textContent="Toplam: "+arr.length;
 
-    $("criticalList").innerHTML = critical.map(p=>cardHTML(p,"critical")).join("") || `<div class="sub">Yok</div>`;
-    $("priceList").innerHTML    = price.map(p=>cardHTML(p,"price")).join("") || `<div class="sub">Yok</div>`;
-    $("allList").innerHTML      = arr.map(p=>cardHTML(p,"all")).join("") || `<div class="sub">Henüz ürün yok</div>`;
+    $("criticalList").innerHTML = critical.map(cardHTML).join("") || `<div class="sub">Yok</div>`;
+    $("priceList").innerHTML    = price.map(cardHTML).join("") || `<div class="sub">Yok</div>`;
+    $("allList").innerHTML      = arr.map(cardHTML).join("") || `<div class="sub">Henüz ürün yok</div>`;
+
+    // click bindings
+    ["criticalList","priceList","allList"].forEach(listId=>{
+      const el=$(listId);
+      el.querySelectorAll("[data-id]").forEach(node=>{
+        node.addEventListener("click", ()=>openActions(node.getAttribute("data-id")));
+      });
+    });
+
+    // paylaşım modu: kullanıcı hangi bölümdeyse ona göre (scroll’a göre basit)
+    // En üstte hangi başlık görünüyorsa onu baz alalım:
+    // (Basit/sağlam: share her zaman filtreli listeyi paylaşır; q varsa q’ya göre.)
+    // currentShareMode sadece metin başlığı için:
+    currentShareMode = "all";
   }
 
   function currentShareText(){
     const arr=getFiltered();
-    const critical = arr.filter(isCritical);
-    const price = arr.filter(isPriceHit);
+
+    // Ekran mantığı: kritik + fiyat + tüm ürünler var.
+    // Paylaş: 3 blok halinde üret
+    const critical = arr.filter(p=>daysUntil(p.skt) < 0);
+    const price = arr.filter(p=>{
+      const d=daysUntil(p.skt);
+      const pd=Number(p.priceDays||0);
+      return pd>0 && d<=pd && d>=0;
+    });
 
     const fmt = (p)=>{
       const d=daysUntil(p.skt);
-      const cd=Number(p.criticalDays ?? 0);
       const pd=Number(p.priceDays||0);
-      const tag = (d<=cd) ? "KRİTİK" : (pd>0 && d<=pd ? "FİYAT" : "NORMAL");
+      const tag = d<0 ? "KRİTİK" : (pd>0 && d<=pd ? "FİYAT" : "NORMAL");
       return `- ${p.name} | ${p.qty} adet | SKT ${p.skt} | ${tag}`;
     };
 
     let out=[];
     out.push("stok_kontrol");
     out.push("");
-    out.push("KRİTİK (SKT eşiği):");
+    out.push("KRİTİK (SKT geçti):");
     out.push(critical.length ? critical.map(fmt).join("\n") : "- Yok");
     out.push("");
-    out.push("FİYAT ZAMANI:");
+    out.push("FİYAT ZAMANI (son 30 gün vb):");
     out.push(price.length ? price.map(fmt).join("\n") : "- Yok");
     out.push("");
     out.push("TÜM ÜRÜNLER:");
@@ -294,7 +300,6 @@
       name: ($("pName").value||"").trim(),
       qty: parseInt(($("qty").value||"0"),10)||0,
       skt: ($("skt").value||"").trim(),
-
       supply: $("supply").value,
       siparisVeren: ($("siparisVeren").value||"").trim(),
       siparisAlan: ($("siparisAlan").value||"").trim(),
@@ -302,9 +307,7 @@
       insertName: ($("insertName").value||"").trim(),
       insertDateText: ($("insertDateText").value||"").trim(),
       note: ($("note").value||"").trim(),
-
       priceDays: parseInt(($("priceDays").value||"0"),10)||0,
-      criticalDays: parseInt(($("criticalDays").value||"0"),10)||0,
       createdAt: now
     };
 
@@ -331,31 +334,30 @@
   }
 
   function bind(){
-    // Drawer
     $("menuBtn").addEventListener("click", openDrawer);
     $("drawerBack").addEventListener("click", closeDrawer);
+
     $("openAddFromMenu").addEventListener("click", ()=>{ closeDrawer(); openAddNew(); });
+
     $("copyBtn").addEventListener("click", async ()=>{
       const t=currentShareText();
       try{ await navigator.clipboard.writeText(t); toast("Kopyalandı"); }catch(_){ toast("Kopyalanamadı"); }
       closeDrawer();
     });
 
-    // Search
     $("searchBtn").addEventListener("click", ()=>{
       const w=$("searchWrap");
       w.style.display = (w.style.display==="block") ? "none" : "block";
       if(w.style.display==="block") setTimeout(()=>$("q").focus(), 30);
     });
+
     $("q").addEventListener("input", render);
 
-    // Modal close
     $("modalBack").addEventListener("click", closeAllModals);
     $("closeAdd").addEventListener("click", ()=>closeModal("modalAdd"));
     $("closeAct").addEventListener("click", ()=>closeModal("modalActions"));
     $("closeRem").addEventListener("click", ()=>closeModal("modalRemove"));
 
-    // Form logic
     $("supply").addEventListener("change", refreshSupplyUI);
     $("dagiNeden").addEventListener("change", refreshSupplyUI);
 
@@ -363,12 +365,12 @@
     $("qty").addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); stageSave(); }});
     $("saveAdd").addEventListener("click", stageSave);
 
-    // Actions
     $("actEdit").addEventListener("click", ()=>openEdit(selectedId));
     $("actRemove").addEventListener("click", ()=>{
       closeModal("modalActions");
       openModal("modalRemove");
     });
+
     $("confirmRem").addEventListener("click", ()=>{
       const reason=$("remReason").value;
       const note=$("remNote").value||"";
@@ -378,7 +380,6 @@
       toast("Kaldırıldı");
     });
 
-    // Wheel
     $("dwClose").addEventListener("click", hideWheel);
     $("dwBack").addEventListener("click", hideWheel);
     $("dwToday").addEventListener("click", ()=>{
@@ -393,18 +394,9 @@
       finalizeSave();
     });
 
-    // Share (Android share sheet)
-    $("shareFab").addEventListener("click", ()=> shareText(currentShareText()));
-
-    // LIST CLICK: tek listener (donma azaltır)
-    const onListClick = (e)=>{
-      const card = e.target.closest("[data-id]");
-      if(!card) return;
-      openActions(card.getAttribute("data-id"));
-    };
-    $("criticalList").addEventListener("click", onListClick);
-    $("priceList").addEventListener("click", onListClick);
-    $("allList").addEventListener("click", onListClick);
+    $("shareFab").addEventListener("click", ()=>{
+      shareText(currentShareText());
+    });
 
     refreshSupplyUI();
     render();
