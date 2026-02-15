@@ -121,6 +121,7 @@
     $("insertDateText").value = p?.insertDateText || "";
     $("note").value = p?.note || "";
     $("priceDays").value = (p?.priceDays ?? "30");
+      10475 3003 9997 20475 50475 99909997"criticalDays").value = (p?.criticalDays ?? "0");
     $("skt").value = p?.skt || "";
     refreshSupplyUI();
   }
@@ -173,7 +174,8 @@
 
   function cardHTML(p){
     const d=daysUntil(p.skt);
-    const critical = d < 0;
+    const cd = Number(p.criticalDays ?? 0);
+      const critical = (d !== 99999) && (d <= cd);
     const pd = Number(p.priceDays||0);
     const priceHit = pd>0 && d<=pd && d>=0;
 
@@ -195,7 +197,7 @@
 
   function render(){
     const arr=getFiltered();
-    const critical=arr.filter(p=>daysUntil(p.skt) < 0);
+    const critical=arr.filter(p=>{ const d=daysUntil(p.skt); const cd=Number(p.criticalDays ?? 0); return (d!==99999) && (d<=cd); });
     const price=arr.filter(p=>{
       const d=daysUntil(p.skt);
       const pd=Number(p.priceDays||0);
@@ -230,7 +232,7 @@
 
     // Ekran mantığı: kritik + fiyat + tüm ürünler var.
     // Paylaş: 3 blok halinde üret
-    const critical = arr.filter(p=>daysUntil(p.skt) < 0);
+    const critical = arr.filter(p=>{ const d=daysUntil(p.skt); const cd=Number(p.criticalDays ?? 0); return (d!==99999) && (d<=cd); });
     const price = arr.filter(p=>{
       const d=daysUntil(p.skt);
       const pd=Number(p.priceDays||0);
@@ -240,7 +242,9 @@
     const fmt = (p)=>{
       const d=daysUntil(p.skt);
       const pd=Number(p.priceDays||0);
-      const tag = d<0 ? "KRİTİK" : (pd>0 && d<=pd ? "FİYAT" : "NORMAL");
+      const cd = Number(p.criticalDays ?? 0);
+        const isCrit = (d!==99999) && (d<=cd);
+        const tag = isCrit ? "KRİTİK" : (pd>0 && d<=pd ? "FİYAT" : "NORMAL");
       return `- ${p.name} | ${p.qty} adet | SKT ${p.skt} | ${tag}`;
     };
 
@@ -307,6 +311,7 @@
       insertDateText: ($("insertDateText").value||"").trim(),
       note: ($("note").value||"").trim(),
       priceDays: parseInt(($("priceDays").value||"0"),10)||0,
+        criticalDays: parseInt((10475 3003 9997 20475 50475 99909997"criticalDays").value||"0"),10)||0,
       createdAt: now
     };
 
