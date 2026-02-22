@@ -5,152 +5,130 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stok Kontrol Motoru</title>
 <style>
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;background:#fff;color:#0f172a}
-  main{padding:18px;max-width:520px;margin:auto}
-  .row{display:flex;gap:10px;margin:12px 0}
-  .input{flex:1;padding:14px;font-size:16px;border:1px solid #e5e7eb;border-radius:14px}
-  .btn{padding:14px 16px;font-size:16px;border:0;border-radius:14px;background:#16a34a;color:#fff;font-weight:800}
-  .card{padding:12px;border:1px solid #e5e7eb;border-radius:14px;margin-bottom:10px}
-  .hint{font-size:12px;color:#64748b}
-  .small{font-size:12px;color:#334155}
-  #errBox{display:none;margin:12px 0;padding:12px;border-radius:14px;border:1px solid #fecaca;background:#fff1f2;color:#7f1d1d;white-space:pre-wrap}
+body{font-family:system-ui;margin:0;background:#fff}
+main{padding:18px;max-width:520px;margin:auto}
+.row{display:flex;gap:10px;margin:10px 0}
+.input{flex:1;padding:14px;font-size:16px;border:1px solid #ddd;border-radius:12px}
+.btn{padding:14px;border-radius:12px;border:0;font-weight:700;cursor:pointer}
+.green{background:#16a34a;color:#fff}
+.red{background:#dc2626;color:#fff}
+.gray{background:#e5e7eb}
+.list{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+.item{padding:14px;border:1px solid #ddd;border-radius:14px}
+.small{font-size:12px;color:#64748b}
+.modal{
+ position:fixed;left:0;right:0;bottom:0;background:#fff;
+ border-top-left-radius:20px;border-top-right-radius:20px;
+ padding:18px;box-shadow:0 -4px 20px rgba(0,0,0,.1);
+ display:none
+}
 </style>
 </head>
 <body>
 <main>
-  <h2 style="margin:0">Stok Kontrol Motoru</h2>
-  <div class="hint">v0.2.1 — Motor + hata yakalama aktif</div>
+<h2>Stok Kontrol</h2>
 
-  <div id="errBox"></div>
+<div class="row">
+  <input id="prodName" class="input" placeholder="Ürün adı">
+  <button id="btnAdd" class="btn green">Ekle</button>
+</div>
 
-  <div class="row">
-    <input id="prodName" class="input" placeholder="Ürün adı">
-    <button id="btnAdd" class="btn">Ekle</button>
-  </div>
-
-  <div id="products"></div>
+<div id="list" class="list"></div>
 </main>
 
+<div id="modal" class="modal">
+  <div class="row">
+    <button id="plusBtn" class="btn green">Artış</button>
+    <button id="minusBtn" class="btn red">Azalış</button>
+  </div>
+
+  <div class="row">
+    <select id="type" class="input">
+      <option value="">Tip seç</option>
+      <option value="siparis">Sipariş</option>
+      <option value="dagitim">Dağılım</option>
+      <option value="satis">Satış</option>
+      <option value="skt">SKT</option>
+      <option value="iade">İade</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <input id="qty" type="number" class="input" placeholder="Adet">
+    <button id="saveOp" class="btn gray">Kaydet</button>
+  </div>
+</div>
+
 <script>
-(function(){
-  const KEY="stok_kontrol_v2";
-  const $=id=>document.getElementById(id);
+const KEY="stok_kontrol_v2";
+const $=id=>document.getElementById(id);
+let db=JSON.parse(localStorage.getItem(KEY)||"null")||{items:[],ops:[]};
+let activeId=null;
+let activeDir=null;
 
-  function showErr(msg){
-    const box = $("errBox");
-    box.style.display="block";
-    box.textContent = "HATA:\n" + msg;
-  }
+function save(){localStorage.setItem(KEY,JSON.stringify(db))}
 
-  // Basit id üretici (crypto.randomUUID yok!)
-  function uid(){
-    return (Date.now().toString(16) + Math.random().toString(16).slice(2));
-  }
-
-  let db = null;
-
-  function load(){
-    try{
-      db = JSON.parse(localStorage.getItem(KEY)||"null") || { products: [], operations: [] };
-      if(!db.products) db.products=[];
-      if(!db.operations) db.operations=[];
-    }catch(e){
-      db = { products: [], operations: [] };
-      showErr("localStorage parse sorunu: " + e);
+function stockOf(id){
+  let total=0;
+  for(const op of db.ops){
+    if(op.productId===id){
+      total += op.dir==="+" ? op.qty : -op.qty;
     }
   }
+  return total;
+}
 
-  function save(){
-    localStorage.setItem(KEY, JSON.stringify(db));
+function render(){
+  const box=$("list");
+  box.innerHTML="";
+  for(const it of db.items){
+    const el=document.createElement("div");
+    el.className="item";
+    el.innerHTML=
+      "<b>"+it.name+"</b><br>"+
+      "<span class='small'>Stok: "+stockOf(it.id)+"</span>";
+    el.onclick=()=>{
+      activeId=it.id;
+      $("modal").style.display="block";
+    };
+    box.appendChild(el);
   }
+}
 
-  function createProduct(name){
-    const p = { id: uid(), name, createdAt: Date.now() };
-    db.products.push(p);
-    save();
-    return p;
-  }
+function add(){
+  const name=($("prodName").value||"").trim();
+  if(!name){alert("Ürün adı yaz.");return;}
+  db.items.push({id:Date.now().toString(16),name});
+  save();
+  $("prodName").value="";
+  render();
+}
 
-  function addOperation(productId, type, quantity=0, subType=null){
-    db.operations.push({
-      id: uid(),
-      productId,
-      type,      // order | distribution | sale | waste | price_request | skt_check
-      subType,   // normal | iskonto | insert
-      quantity,
-      timestamp: Date.now()
-    });
-    save();
-  }
+$("btnAdd").onclick=add;
 
-  function getStock(productId){
-    const ops = db.operations.filter(o=>o.productId===productId);
-    let stock = 0;
-    for(const o of ops){
-      if(o.type==="order") stock += o.quantity;
-      if(o.type==="distribution") stock += o.quantity;
-      if(o.type==="sale") stock -= o.quantity;
-      if(o.type==="waste") stock -= o.quantity;
-    }
-    return stock;
-  }
+$("plusBtn").onclick=()=>activeDir="+";
+$("minusBtn").onclick=()=>activeDir="-";
 
-  function render(){
-    const box = $("products");
-    box.innerHTML = "";
+$("saveOp").onclick=()=>{
+  const type=$("type").value;
+  const qty=parseInt($("qty").value||0);
+  if(!activeDir||!type||!qty){alert("Eksik alan");return;}
+  db.ops.push({
+    productId:activeId,
+    dir:activeDir,
+    type,
+    qty,
+    ts:Date.now()
+  });
+  save();
+  $("modal").style.display="none";
+  $("qty").value="";
+  $("type").value="";
+  activeDir=null;
+  render();
+};
 
-    if(!db.products.length){
-      box.innerHTML = "<div class='card'>Henüz ürün yok.</div>";
-      return;
-    }
-
-    for(const p of db.products){
-      const stock = getStock(p.id);
-      const el = document.createElement("div");
-      el.className="card";
-      el.innerHTML = `
-        <strong>${p.name}</strong>
-        <div class="small">Stok: ${stock}</div>
-        <div class="row">
-          <button class="btn" data-a="dist" data-id="${p.id}">+1 Dağılım</button>
-          <button class="btn" data-a="sale" data-id="${p.id}">-1 Satış</button>
-        </div>
-      `;
-      box.appendChild(el);
-    }
-
-    // Delegation: butonlar kesin çalışsın
-    box.querySelectorAll("button[data-a]").forEach(b=>{
-      b.onclick = ()=>{
-        const pid = b.getAttribute("data-id");
-        const a = b.getAttribute("data-a");
-        if(a==="dist") addOperation(pid,"distribution",1);
-        if(a==="sale") addOperation(pid,"sale",1);
-        render();
-      };
-    });
-  }
-
-  function add(){
-    const inp = $("prodName");
-    const name = (inp.value||"").trim();
-    if(!name){ alert("Ürün adı yaz."); inp.focus(); return; }
-    createProduct(name);
-    inp.value="";
-    inp.focus();
-    render();
-  }
-
-  try{
-    load();
-    $("btnAdd").onclick = add;
-    $("prodName").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); add(); }});
-    render();
-    $("prodName").focus();
-  }catch(e){
-    showErr(String(e && e.stack ? e.stack : e));
-  }
-})();
+render();
 </script>
 </body>
 </html>
