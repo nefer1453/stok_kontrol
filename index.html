@@ -28,12 +28,12 @@
   <div id="list" class="list"></div>
 </main>
 
-<script>
-const KEY="stok_kontrol_v1";
-const $=id=>document.getElementById(id);
-let db=JSON.parse(localStorage.getItem(KEY)||"null")||{items:[],ops:[]};
+<script type="module">
+import { load, save, addItem } from "./core/model.js";
 
-function save(){localStorage.setItem(KEY,JSON.stringify(db))}
+const $=id=>document.getElementById(id);
+let db = load();
+
 function render(){
   const box=$("list");
   box.innerHTML="";
@@ -52,8 +52,8 @@ function render(){
 function add(){
   const name=($("prodName").value||"").trim();
   if(!name){ alert("Ürün adı yaz."); $("prodName").focus(); return; }
-  db.items.push({id:Date.now().toString(16), name, ts:Date.now()});
-  save();
+  addItem(db, name);
+  save(db);
   $("prodName").value="";
   $("prodName").focus();
   render();
