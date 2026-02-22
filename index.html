@@ -20,9 +20,9 @@ function safeFocus(el){
   try{
     if(!el) return;
     // klavye/viewport zıplamasını azaltır
-    el.focus({preventScroll:true});
+    el/* focus disabled */
   }catch(e){
-    try{ el && el.focus(); }catch(_){}
+    try{ el && el/* focus disabled */ }catch(_){}
   }
 }
 // Global: otomatik focus'u varsayılan kapalı tut
