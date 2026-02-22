@@ -5,128 +5,111 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stok Kontrol Motoru</title>
 <style>
-body{font-family:system-ui;margin:0;background:#fff}
-main{padding:18px;max-width:520px;margin:auto}
-.row{display:flex;gap:10px;margin:10px 0}
-.input{flex:1;padding:14px;font-size:16px;border:1px solid #ddd;border-radius:12px}
-.btn{padding:14px;border-radius:12px;border:0;font-weight:700;cursor:pointer}
-.green{background:#16a34a;color:#fff}
-.red{background:#dc2626;color:#fff}
-.gray{background:#e5e7eb}
-.list{display:flex;flex-direction:column;gap:10px;margin-top:20px}
-.item{padding:14px;border:1px solid #ddd;border-radius:14px}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto;margin:0;background:#f8fafc}
+main{max-width:520px;margin:auto;padding:16px}
+input{flex:1;padding:14px;font-size:16px;border:1px solid #ddd;border-radius:14px}
+button{padding:12px 16px;border:0;border-radius:14px;background:#16a34a;color:#fff;font-weight:700}
+.row{display:flex;gap:10px;margin-bottom:16px}
+.card{background:#fff;padding:14px;border-radius:14px;margin-bottom:12px;border:1px solid #e5e7eb}
 .small{font-size:12px;color:#64748b}
-.modal{
- position:fixed;left:0;right:0;bottom:0;background:#fff;
- border-top-left-radius:20px;border-top-right-radius:20px;
- padding:18px;box-shadow:0 -4px 20px rgba(0,0,0,.1);
- display:none
-}
+.actions{display:flex;gap:8px;margin-top:10px}
+.actions button{flex:1}
 </style>
 </head>
 <body>
 <main>
-<h2>Stok Kontrol</h2>
+<h2>Stok Kontrol Motoru</h2>
+<div class="small">v0.3 — Hareket motoru aktif</div>
 
 <div class="row">
-  <input id="prodName" class="input" placeholder="Ürün adı">
-  <button id="btnAdd" class="btn green">Ekle</button>
+  <input id="prodName" placeholder="Ürün adı">
+  <button onclick="addProduct()">Ekle</button>
 </div>
 
-<div id="list" class="list"></div>
+<div id="list"></div>
 </main>
 
-<div id="modal" class="modal">
-  <div class="row">
-    <button id="plusBtn" class="btn green">Artış</button>
-    <button id="minusBtn" class="btn red">Azalış</button>
-  </div>
-
-  <div class="row">
-    <select id="type" class="input">
-      <option value="">Tip seç</option>
-      <option value="siparis">Sipariş</option>
-      <option value="dagitim">Dağılım</option>
-      <option value="satis">Satış</option>
-      <option value="skt">SKT</option>
-      <option value="iade">İade</option>
-    </select>
-  </div>
-
-  <div class="row">
-    <input id="qty" type="number" class="input" placeholder="Adet">
-    <button id="saveOp" class="btn gray">Kaydet</button>
-  </div>
-</div>
-
 <script>
-const KEY="stok_kontrol_v2";
+const KEY="stok_kontrol_v3";
 const $=id=>document.getElementById(id);
-let db=JSON.parse(localStorage.getItem(KEY)||"null")||{items:[],ops:[]};
-let activeId=null;
-let activeDir=null;
 
-function save(){localStorage.setItem(KEY,JSON.stringify(db))}
+let db=JSON.parse(localStorage.getItem(KEY)||"null")||{
+  products:[],
+  ops:[]
+};
 
-function stockOf(id){
-  let total=0;
-  for(const op of db.ops){
-    if(op.productId===id){
-      total += op.dir==="+" ? op.qty : -op.qty;
-    }
-  }
-  return total;
+function save(){
+  localStorage.setItem(KEY,JSON.stringify(db));
+}
+
+function stockOf(productId){
+  return db.ops
+    .filter(o=>o.productId===productId)
+    .reduce((t,o)=>t+o.qty,0);
+}
+
+function addProduct(){
+  const name=$("prodName").value.trim();
+  if(!name){ alert("Ürün adı yaz."); return;}
+  db.products.push({
+    id:Date.now().toString(16),
+    name
+  });
+  $("prodName").value="";
+  save();
+  render();
+}
+
+function addOp(productId, qty, reason){
+  db.ops.push({
+    id:Date.now().toString(16),
+    productId,
+    qty,
+    reason,
+    ts:Date.now()
+  });
+  save();
+  render();
 }
 
 function render(){
   const box=$("list");
   box.innerHTML="";
-  for(const it of db.items){
+  db.products.forEach(p=>{
+    const stock=stockOf(p.id);
     const el=document.createElement("div");
-    el.className="item";
-    el.innerHTML=
-      "<b>"+it.name+"</b><br>"+
-      "<span class='small'>Stok: "+stockOf(it.id)+"</span>";
-    el.onclick=()=>{
-      activeId=it.id;
-      $("modal").style.display="block";
-    };
+    el.className="card";
+    el.innerHTML=`
+      <b>${p.name}</b>
+      <div class="small">Stok: ${stock}</div>
+      <div class="actions">
+        <button onclick="chooseIncrease('${p.id}')">Artış</button>
+        <button onclick="chooseDecrease('${p.id}')">Azalış</button>
+      </div>
+    `;
     box.appendChild(el);
+  });
+}
+
+function chooseIncrease(id){
+  const type=prompt("Artış sebebi:\n1-Sipariş\n2-Dağılım");
+  if(type==="1"){
+    addOp(id,1,"sipariş");
+  }else if(type==="2"){
+    addOp(id,1,"dağılım");
   }
 }
 
-function add(){
-  const name=($("prodName").value||"").trim();
-  if(!name){alert("Ürün adı yaz.");return;}
-  db.items.push({id:Date.now().toString(16),name});
-  save();
-  $("prodName").value="";
-  render();
+function chooseDecrease(id){
+  const type=prompt("Azalış sebebi:\n1-Satış\n2-SKT\n3-İade");
+  if(type==="1"){
+    addOp(id,-1,"satış");
+  }else if(type==="2"){
+    addOp(id,-1,"skt");
+  }else if(type==="3"){
+    addOp(id,-1,"iade");
+  }
 }
-
-$("btnAdd").onclick=add;
-
-$("plusBtn").onclick=()=>activeDir="+";
-$("minusBtn").onclick=()=>activeDir="-";
-
-$("saveOp").onclick=()=>{
-  const type=$("type").value;
-  const qty=parseInt($("qty").value||0);
-  if(!activeDir||!type||!qty){alert("Eksik alan");return;}
-  db.ops.push({
-    productId:activeId,
-    dir:activeDir,
-    type,
-    qty,
-    ts:Date.now()
-  });
-  save();
-  $("modal").style.display="none";
-  $("qty").value="";
-  $("type").value="";
-  activeDir=null;
-  render();
-};
 
 render();
 </script>
