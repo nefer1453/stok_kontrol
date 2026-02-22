@@ -20,7 +20,7 @@ select,input{padding:10px;border-radius:10px;border:1px solid #ddd;width:100%;ma
 
 <div class="card">
 <input id="prodInput" placeholder="Ürün adı">
-<button onclick="addProduct()">Ürün Ekle</button>
+<button onclick="addProduct()" type="button">Ürün Ekle</button>
 </div>
 
 <div id="products"></div>
@@ -94,7 +94,7 @@ box.innerHTML+=`
 
 <input id="qty_${p.id}" type="number" placeholder="Miktar">
 
-<button onclick="addEvent(${p.id})">İşlem Ekle</button>
+<button onclick="addEvent(${p.id})" type="button">İşlem Ekle</button>
 </div>
 `
 })
@@ -102,5 +102,18 @@ box.innerHTML+=`
 
 render()
 </script>
+
+<script>
+/* SUBMIT_GUARD_V1 */
+(function(){
+  // Herhangi bir form submit'i asla sayfayı yenilemesin
+  window.addEventListener("submit", function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  }, true);
+})();
+</script>
+
 </body>
 </html>
