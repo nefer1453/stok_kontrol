@@ -2,159 +2,85 @@
 <html lang="tr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stok Kontrol Motoru</title>
-
 <style>
-:root{
-  --bg:#ffffff;
-  --text:#0f172a;
-  --border:#e5e7eb;
-  --green:#16a34a;
-}
-
-*{box-sizing:border-box}
-
-body{
-  margin:0;
-  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-  background:var(--bg);
-  color:var(--text);
-}
-
-main{
-  max-width:520px;
-  margin:auto;
-  padding:20px;
-}
-
-h2{
-  margin:0 0 6px 0;
-}
-
-.hint{
-  font-size:12px;
-  color:#64748b;
-  margin-bottom:14px;
-}
-
-.row{
-  display:flex;
-  gap:10px;
-}
-
-input{
-  flex:1;
-  padding:14px;
-  font-size:16px;
-  border-radius:14px;
-  border:1px solid var(--border);
-  outline:none;
-}
-
-button{
-  padding:14px 16px;
-  font-size:16px;
-  border-radius:14px;
-  border:none;
-  background:var(--green);
-  color:white;
-  font-weight:700;
-}
-
-.list{
-  margin-top:18px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-
-.item{
-  padding:12px;
-  border-radius:14px;
-  border:1px solid var(--border);
-}
+body{font-family:system-ui;margin:0;background:#fff;color:#0f172a}
+main{padding:18px;max-width:520px;margin:auto}
+.row{display:flex;gap:10px;margin:12px 0}
+.input{flex:1;padding:14px;font-size:16px;border:1px solid #e5e7eb;border-radius:14px}
+.btn{padding:14px 16px;font-size:16px;border:0;border-radius:14px;background:#16a34a;color:#fff;font-weight:800}
+.list{margin-top:18px;display:flex;flex-direction:column;gap:10px}
+.item{padding:14px;border:1px solid #e5e7eb;border-radius:14px;display:flex;justify-content:space-between;align-items:center}
+.stock{font-weight:900;color:#16a34a}
+.hint{color:#64748b;font-size:12px}
 </style>
 </head>
-
 <body>
 <main>
-
 <h2>Stok Kontrol Motoru</h2>
-<div class="hint">v0.3 – stabil temel yapı</div>
+<div class="hint">v0.4 — stok alanı eklendi</div>
 
 <div class="row">
-  <input id="prodName" placeholder="Ürün adı" autocomplete="off">
-  <button id="btnAdd">Ekle</button>
+  <input id="prodName" class="input" placeholder="Ürün adı">
+  <button id="btnAdd" class="btn">Ekle</button>
 </div>
 
 <div id="list" class="list"></div>
-
 </main>
 
 <script>
 const KEY="stok_kontrol_v1";
 const $=id=>document.getElementById(id);
+let db=JSON.parse(localStorage.getItem(KEY)||"null")||{products:[],operations:[]};
 
-let state = JSON.parse(localStorage.getItem(KEY) || "null") 
-            || { items:[], ops:[] };
-
-function save(){
-  localStorage.setItem(KEY, JSON.stringify(state));
-}
+function save(){localStorage.setItem(KEY,JSON.stringify(db))}
 
 function render(){
-  const box = $("list");
+  const box=$("list");
   box.innerHTML="";
-
-  if(!state.items.length){
-    box.innerHTML = "<div class='item'>Henüz ürün yok.</div>";
+  if(!db.products.length){
+    box.innerHTML="<div class='item'>Henüz ürün yok.</div>";
     return;
   }
 
-  for(const it of state.items){
+  for(const p of db.products){
     const el=document.createElement("div");
     el.className="item";
-    el.textContent=it.name;
+    el.innerHTML=`
+      <div>${p.name}</div>
+      <div class="stock">${p.stock}</div>
+    `;
     box.appendChild(el);
   }
 }
 
-function addProduct(){
-  const input = $("prodName");
-  const name = (input.value || "").trim();
+function add(){
+  const name=($("prodName").value||"").trim();
+  if(!name){ alert("Ürün adı yaz."); $("prodName").focus(); return; }
 
-  if(!name){
-    input.focus();
-    return;
-  }
-
-  state.items.push({
+  db.products.push({
     id:Date.now().toString(16),
     name,
-    ts:Date.now()
+    stock:0
   });
 
   save();
-  input.value="";
+  $("prodName").value="";
+  $("prodName").focus();
   render();
-
-  // focus'u render'dan sonra geri ver
-  requestAnimationFrame(()=>input.focus());
 }
 
-$("btnAdd").onclick = addProduct;
-
-$("prodName").addEventListener("keydown",e=>{
+$("btnAdd").onclick=add;
+$("prodName").addEventListener("keydown",(e)=>{
   if(e.key==="Enter"){
     e.preventDefault();
-    addProduct();
+    add();
   }
 });
 
 render();
 $("prodName").focus();
 </script>
-
 </body>
 </html>
