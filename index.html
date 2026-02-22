@@ -5,128 +5,152 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stok Kontrol Motoru</title>
 <style>
-body{font-family:system-ui;margin:0;background:#fff;color:#0f172a}
-main{padding:18px;max-width:520px;margin:auto}
-.row{display:flex;gap:10px;margin:12px 0}
-.input{flex:1;padding:14px;font-size:16px;border:1px solid #e5e7eb;border-radius:14px}
-.btn{padding:14px 16px;font-size:16px;border:0;border-radius:14px;background:#16a34a;color:#fff;font-weight:800}
-.card{padding:12px;border:1px solid #e5e7eb;border-radius:14px;margin-bottom:10px}
-.hint{font-size:12px;color:#64748b}
-.small{font-size:12px;color:#334155}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;background:#fff;color:#0f172a}
+  main{padding:18px;max-width:520px;margin:auto}
+  .row{display:flex;gap:10px;margin:12px 0}
+  .input{flex:1;padding:14px;font-size:16px;border:1px solid #e5e7eb;border-radius:14px}
+  .btn{padding:14px 16px;font-size:16px;border:0;border-radius:14px;background:#16a34a;color:#fff;font-weight:800}
+  .card{padding:12px;border:1px solid #e5e7eb;border-radius:14px;margin-bottom:10px}
+  .hint{font-size:12px;color:#64748b}
+  .small{font-size:12px;color:#334155}
+  #errBox{display:none;margin:12px 0;padding:12px;border-radius:14px;border:1px solid #fecaca;background:#fff1f2;color:#7f1d1d;white-space:pre-wrap}
 </style>
 </head>
 <body>
-
 <main>
-<h2 style="margin:0">Stok Kontrol Motoru</h2>
-<div class="hint">v0.2 — Motor çekirdeği aktif</div>
+  <h2 style="margin:0">Stok Kontrol Motoru</h2>
+  <div class="hint">v0.2.1 — Motor + hata yakalama aktif</div>
 
-<div class="row">
-  <input id="prodName" class="input" placeholder="Ürün adı">
-  <button id="btnAdd" class="btn">Ekle</button>
-</div>
+  <div id="errBox"></div>
 
-<div id="products"></div>
+  <div class="row">
+    <input id="prodName" class="input" placeholder="Ürün adı">
+    <button id="btnAdd" class="btn">Ekle</button>
+  </div>
 
+  <div id="products"></div>
 </main>
 
 <script>
-const KEY="stok_kontrol_v2";
-const $=id=>document.getElementById(id);
+(function(){
+  const KEY="stok_kontrol_v2";
+  const $=id=>document.getElementById(id);
 
-let db = JSON.parse(localStorage.getItem(KEY)||"null") || {
-  products: [],
-  operations: []
-};
-
-function save(){
-  localStorage.setItem(KEY, JSON.stringify(db));
-}
-
-function createProduct(name){
-  const p = {
-    id: Date.now().toString(16),
-    name,
-    createdAt: Date.now()
-  };
-  db.products.push(p);
-  save();
-  return p;
-}
-
-function addOperation(productId, type, quantity=0, subType=null){
-  db.operations.push({
-    id: crypto.randomUUID(),
-    productId,
-    type,           // order | distribution | sale | waste | price_request | skt_check
-    subType,        // normal | iskonto | insert
-    quantity,
-    timestamp: Date.now()
-  });
-  save();
-}
-
-function getStock(productId){
-  const ops = db.operations.filter(o=>o.productId===productId);
-
-  let stock = 0;
-
-  for(const o of ops){
-    if(o.type==="order") stock += o.quantity;
-    if(o.type==="distribution") stock += o.quantity;
-    if(o.type==="sale") stock -= o.quantity;
-    if(o.type==="waste") stock -= o.quantity;
+  function showErr(msg){
+    const box = $("errBox");
+    box.style.display="block";
+    box.textContent = "HATA:\n" + msg;
   }
 
-  return stock;
-}
-
-function render(){
-  const box = $("products");
-  box.innerHTML = "";
-
-  if(!db.products.length){
-    box.innerHTML="<div class='card'>Henüz ürün yok.</div>";
-    return;
+  // Basit id üretici (crypto.randomUUID yok!)
+  function uid(){
+    return (Date.now().toString(16) + Math.random().toString(16).slice(2));
   }
 
-  for(const p of db.products){
+  let db = null;
 
-    const stock = getStock(p.id);
-
-    const el = document.createElement("div");
-    el.className="card";
-
-    el.innerHTML = `
-      <strong>${p.name}</strong>
-      <div class="small">Stok: ${stock}</div>
-      <div class="row">
-        <button class="btn" onclick="addOp('${p.id}','distribution',1)">+1 Dağılım</button>
-        <button class="btn" onclick="addOp('${p.id}','sale',1)">-1 Satış</button>
-      </div>
-    `;
-
-    box.appendChild(el);
+  function load(){
+    try{
+      db = JSON.parse(localStorage.getItem(KEY)||"null") || { products: [], operations: [] };
+      if(!db.products) db.products=[];
+      if(!db.operations) db.operations=[];
+    }catch(e){
+      db = { products: [], operations: [] };
+      showErr("localStorage parse sorunu: " + e);
+    }
   }
-}
 
-window.addOp = function(pid,type,qty){
-  addOperation(pid,type,qty);
-  render();
-}
+  function save(){
+    localStorage.setItem(KEY, JSON.stringify(db));
+  }
 
-$("btnAdd").onclick=()=>{
-  const name=($("prodName").value||"").trim();
-  if(!name){alert("Ürün adı yaz.");$("prodName").focus();return;}
-  createProduct(name);
-  $("prodName").value="";
-  $("prodName").focus();
-  render();
-};
+  function createProduct(name){
+    const p = { id: uid(), name, createdAt: Date.now() };
+    db.products.push(p);
+    save();
+    return p;
+  }
 
-render();
-$("prodName").focus();
+  function addOperation(productId, type, quantity=0, subType=null){
+    db.operations.push({
+      id: uid(),
+      productId,
+      type,      // order | distribution | sale | waste | price_request | skt_check
+      subType,   // normal | iskonto | insert
+      quantity,
+      timestamp: Date.now()
+    });
+    save();
+  }
+
+  function getStock(productId){
+    const ops = db.operations.filter(o=>o.productId===productId);
+    let stock = 0;
+    for(const o of ops){
+      if(o.type==="order") stock += o.quantity;
+      if(o.type==="distribution") stock += o.quantity;
+      if(o.type==="sale") stock -= o.quantity;
+      if(o.type==="waste") stock -= o.quantity;
+    }
+    return stock;
+  }
+
+  function render(){
+    const box = $("products");
+    box.innerHTML = "";
+
+    if(!db.products.length){
+      box.innerHTML = "<div class='card'>Henüz ürün yok.</div>";
+      return;
+    }
+
+    for(const p of db.products){
+      const stock = getStock(p.id);
+      const el = document.createElement("div");
+      el.className="card";
+      el.innerHTML = `
+        <strong>${p.name}</strong>
+        <div class="small">Stok: ${stock}</div>
+        <div class="row">
+          <button class="btn" data-a="dist" data-id="${p.id}">+1 Dağılım</button>
+          <button class="btn" data-a="sale" data-id="${p.id}">-1 Satış</button>
+        </div>
+      `;
+      box.appendChild(el);
+    }
+
+    // Delegation: butonlar kesin çalışsın
+    box.querySelectorAll("button[data-a]").forEach(b=>{
+      b.onclick = ()=>{
+        const pid = b.getAttribute("data-id");
+        const a = b.getAttribute("data-a");
+        if(a==="dist") addOperation(pid,"distribution",1);
+        if(a==="sale") addOperation(pid,"sale",1);
+        render();
+      };
+    });
+  }
+
+  function add(){
+    const inp = $("prodName");
+    const name = (inp.value||"").trim();
+    if(!name){ alert("Ürün adı yaz."); inp.focus(); return; }
+    createProduct(name);
+    inp.value="";
+    inp.focus();
+    render();
+  }
+
+  try{
+    load();
+    $("btnAdd").onclick = add;
+    $("prodName").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); add(); }});
+    render();
+    $("prodName").focus();
+  }catch(e){
+    showErr(String(e && e.stack ? e.stack : e));
+  }
+})();
 </script>
-
 </body>
 </html>
