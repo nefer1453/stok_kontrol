@@ -97,7 +97,22 @@
     .tab.active{background:linear-gradient(180deg,rgba(37,99,235,.25),rgba(37,99,235,.10));border-color:rgba(37,99,235,.35)}
     .tab.warn{background:linear-gradient(180deg,rgba(245,158,11,.25),rgba(245,158,11,.10));border-color:rgba(245,158,11,.35)}
     .hidden{display:none !important}
-  </style>
+  
+    /* UI_NET_STOK_V1 */
+    /* Net stok: büyük ve vurucu */
+    .pill.netstok{
+      font-weight: 950 !important;
+      font-size: 18px !important;
+      line-height: 1 !important;
+      padding: 10px 14px !important;
+      border-radius: 999px !important;
+      transform: translateZ(0);
+    }
+    /* Kart içindeki net stok daha da öne çıksın */
+    .netstokWrap{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .netstokLabel{ font-size:12px; color:#64748b; font-weight:800; letter-spacing:.2px; }
+    
+</style>
 </head>
 <body>
 <header>
@@ -803,5 +818,27 @@ ensureProductsSeed();
 setMode("plus");
 renderAll();
 </script>
+
+<script>
+/* UI_NET_STOK_DOM_PATCH_V1 */
+(function(){
+  function apply(){
+    try{
+      const pills = document.querySelectorAll('.pill');
+      for(const el of pills){
+        const t = (el.textContent||"").trim().toLowerCase();
+        if(t.startsWith("net") || t.startsWith("net stok") || t.startsWith("net:") || t.startsWith("netstok")){
+          el.classList.add("netstok");
+        }
+      }
+    }catch(_e){}
+  }
+  // İlk yükleme + ufak gecikme (render sonra)
+  apply();
+  setTimeout(apply, 120);
+  setTimeout(apply, 500);
+})();
+</script>
+
 </body>
 </html>
