@@ -97,6 +97,7 @@
     }
     .pill.ok{color:#bbf7d0;border-color:rgba(22,163,74,.35)}
     .pill.bad{color:#fecaca;border-color:rgba(239,68,68,.35)}
+    .pill.warn{color:#fde68a;border-color:rgba(245,158,11,.35)}
     .hr{height:1px;background:rgba(31,42,68,.75);margin:10px 0}
 
     /* Bottom controls (sabit) */
@@ -118,7 +119,7 @@
   <div class="brand">
     <div>
       <div class="t">Stok Kontrol Motoru</div>
-      <div class="v" id="ver">v1.0 • ürün + işlem</div>
+      <div class="v" id="ver">v1.1 • net stok görünür</div>
     </div>
     <div class="hint" id="topInfo"></div>
   </div>
@@ -201,6 +202,7 @@
 
 <script>
 (() => {
+  // ÖNEMLİ: KEY aynı kaldı -> veri kaybı yok
   const KEY="stok_kontrol_v10";
   const $=id=>document.getElementById(id);
   const LS={
@@ -210,11 +212,9 @@
   const uid=()=>Math.random().toString(16).slice(2)+Date.now().toString(16);
   const esc=s=>String(s||"").replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
 
-  // DB
   let db=LS.get(KEY,{products:[], ops:[]});
   function save(){ LS.set(KEY, db); }
 
-  // Kinds
   const INC_KINDS = [
     {v:"Siparis.Firma.Ziyaret",  t:"Sipariş • Firma • Ziyaret"},
     {v:"Siparis.Firma.GelenTel", t:"Sipariş • Firma • Telefon geldi"},
@@ -236,7 +236,7 @@
     {v:"Iade.Raf",               t:"İade • Raf kaynaklı"}
   ];
 
-  let mode="ops"; // ops or products
+  let mode="ops";
 
   function setMode(m){
     mode=m;
@@ -247,10 +247,23 @@
     render();
   }
 
+  // v1.1: net stok hesapla
+  function calcNetByPid(){
+    const net = Object.create(null);
+    for(const p of db.products) net[p.id]=0;
+    for(const o of (db.ops||[])){
+      const q = Number(o.qty||0) || 0;
+      if(!(o.pid in net)) net[o.pid]=0;
+      net[o.pid] += (o.type==="inc" ? q : -q);
+    }
+    return net;
+  }
+
   function syncSelects(){
-    // product select
+    const net = calcNetByPid();
     const sel=$("selProd");
     sel.innerHTML="";
+
     if(!db.products.length){
       sel.innerHTML = `<option value="">Önce ürün ekle</option>`;
       sel.disabled=true;
@@ -263,6 +276,7 @@
       $("quick").innerHTML="";
       return;
     }
+
     sel.disabled=false;
     $("btnInc").disabled=false;
     $("btnDec").disabled=false;
@@ -274,7 +288,8 @@
     for(const p of db.products){
       const o=document.createElement("option");
       o.value=p.id;
-      o.textContent=p.name;
+      const n = net[p.id] ?? 0;
+      o.textContent = `${p.name}  (Stok: ${n})`;
       sel.appendChild(o);
     }
     if(!sel.value) sel.value=db.products[0].id;
@@ -290,11 +305,9 @@
       o.textContent=k.t;
       sel.appendChild(o);
     }
-    // quick chips
     const quick = $("quick");
     quick.innerHTML="";
-    const picks = kinds.slice(0,5);
-    for(const k of picks){
+    for(const k of kinds.slice(0,5)){
       const b=document.createElement("button");
       b.className="chip";
       b.type="button";
@@ -322,31 +335,21 @@
     const p=db.products.find(x=>x.id===pid);
     if(!p){ alert("Ürün seç."); return; }
 
-    const type = $("btnSaveOp").dataset.type || "dec"; // default azalış
+    const type = $("btnSaveOp").dataset.type || "dec";
     const kind = $("selKind").value || "";
     const qty = parseInt(($("qty").value||"").trim(),10);
     const note = ($("note").value||"").trim() || null;
     if(!qty || qty<1){ alert("Adet yaz (>=1)."); $("qty").focus(); return; }
     if(!kind){ alert("Tür seç."); return; }
 
-    db.ops.unshift({
-      id:uid(),
-      ts:Date.now(),
-      pid:p.id,
-      name:p.name,
-      type, // inc / dec
-      kind,
-      qty,
-      note
-    });
-    // limit
+    db.ops.unshift({ id:uid(), ts:Date.now(), pid:p.id, name:p.name, type, kind, qty, note });
     if(db.ops.length>5000) db.ops.length=5000;
     save();
 
-    // reset fast
     $("qty").value="";
     $("note").value="";
     $("qty").focus();
+    syncSelects();
     render();
   }
 
@@ -355,14 +358,15 @@
   }
 
   function render(){
+    const net = calcNetByPid();
+
     $("pCount").textContent = `${db.products.length} ürün`;
     $("opCount").textContent = `${db.ops.length} işlem`;
-    $("topInfo").textContent = mode==="products" ? "Ürün modu" : "İşlem modu";
+    $("topInfo").textContent = mode==="products" ? "Ürün modu (stok görünür)" : "İşlem modu";
 
     syncSelects();
 
     const q=($("q").value||"").trim().toLowerCase();
-
     const box=$("list");
     box.innerHTML="";
 
@@ -377,16 +381,20 @@
         box.innerHTML = `<div class="hint">Henüz ürün yok.</div>`;
         return;
       }
+
       for(const p of rows){
         const el=document.createElement("div");
         el.className="item";
         const used = db.ops.filter(o=>o.pid===p.id).length;
+        const n = net[p.id] ?? 0;
+        const cls = n>0 ? "pill ok" : (n<0 ? "pill bad" : "pill");
         el.innerHTML = `
           <div style="flex:1">
             <div class="name">${esc(p.name)}</div>
-            <div style="margin-top:8px" class="row" style="gap:8px">
-              <span class="pill">${fmtTs(p.ts)}</span>
+            <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
+              <span class="${cls}">Stok: ${n}</span>
               <span class="pill">İşlem: ${used}</span>
+              <span class="pill">${fmtTs(p.ts)}</span>
             </div>
           </div>
           <div>
@@ -427,12 +435,15 @@
       el.className="item";
       const pillCls = o.type==="inc" ? "pill ok" : "pill bad";
       const sign = o.type==="inc" ? "+" : "−";
+      const n = net[o.pid] ?? 0;
+      const nCls = n>0 ? "pill ok" : (n<0 ? "pill bad" : "pill");
       el.innerHTML = `
         <div style="flex:1">
           <div class="name">${esc(o.name)}</div>
           <div class="hint" style="margin-top:6px">${esc(o.kind)}${o.note?` • ${esc(o.note)}`:""}</div>
           <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
             <span class="${pillCls}">${sign}${o.qty}</span>
+            <span class="${nCls}">Stok: ${n}</span>
             <span class="pill">${esc(fmtTs(o.ts))}</span>
           </div>
         </div>
@@ -450,7 +461,6 @@
     }
   }
 
-  // Events
   $("btnAddProd").onclick=addProduct;
   $("prodName").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); addProduct(); }});
 
@@ -474,8 +484,6 @@
     $("prodName").focus();
   };
 
-  // Boot
-  // default: azalış listesi gelsin (çoğu kullanımda satış/skt hızlı)
   setKindList("dec");
   syncSelects();
   setMode("ops");
