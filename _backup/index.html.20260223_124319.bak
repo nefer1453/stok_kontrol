@@ -161,48 +161,7 @@
     </section>
 
     <!-- SAĞ: Kayıtlar -->
-    
-    <!-- SAĞ: Rapor -->
-    <section class="card" id="cardReport">
-      <div class="row" style="justify-content:space-between;align-items:flex-end">
-        <div>
-          <h2 style="margin-bottom:2px">Rapor</h2>
-          <div class="hint">Özet ve “akıl” (bugün / 7 gün / 30 gün)</div>
-        </div>
-        <div class="row" style="gap:8px">
-          <button id="btnReportToday" class="btn btnBLUE" type="button" style="padding:10px 12px;border-radius:14px">Bugün</button>
-          <button id="btnReport7" class="btn btnBLUE" type="button" style="padding:10px 12px;border-radius:14px">7g</button>
-          <button id="btnReport30" class="btn btnBLUE" type="button" style="padding:10px 12px;border-radius:14px">30g</button>
-        </div>
-      </div>
-
-      <div class="sep"></div>
-
-      <div class="kpi">
-        <div class="k">Artış: <b id="rPlus">0</b></div>
-        <div class="k">Azalış: <b id="rMinus">0</b></div>
-        <div class="k">Net: <b id="rNet">0</b></div>
-        <div class="k">İşlem: <b id="rOps">0</b></div>
-      </div>
-
-      <div class="sep"></div>
-
-      <div class="row" style="gap:10px;align-items:flex-start;flex-wrap:wrap">
-        <div style="flex:1;min-width:240px">
-          <div class="hint" style="margin-bottom:8px">Türlere göre</div>
-          <div id="rKinds" class="list"></div>
-        </div>
-        <div style="flex:1;min-width:240px">
-          <div class="hint" style="margin-bottom:8px">En çok hareket</div>
-          <div id="rTop" class="list"></div>
-        </div>
-      </div>
-
-      <div class="sep"></div>
-      <div class="hint" id="rRangeHint">Aralık: —</div>
-    </section>
-
-<section class="card">
+    <section class="card">
       <div class="row" style="justify-content:space-between;align-items:flex-end">
         <div>
           <h2 style="margin-bottom:2px">Kayıtlar</h2>
@@ -476,7 +435,6 @@ function addOperation(){
   buildExtraFields();
 
   renderAll();
-reportToday();
   return {ok:true, msg:"İşlem eklendi."};
 }
 
@@ -572,178 +530,6 @@ function renderAll(){
   renderKPIs();
 }
 
-
-/* ====== REPORT (v1.2) ====== */
-function kindGroup(kind){
-  if(kind.startsWith("siparis_")) return "Sipariş";
-  if(kind.startsWith("dagilim_")) return "Dağılım";
-  if(kind.startsWith("satis_")) return "Satış";
-  if(kind.startsWith("azalis_skt")) return "SKT";
-  if(kind.startsWith("iade_")) return "İade";
-  return "Diğer";
-}
-
-function reportForDays(days){
-  const end = Date.now();
-  const start = end - (days*24*60*60*1000);
-
-  const inRange = (op)=> op.ts >= start && op.ts <= end;
-
-  let plus=0, minus=0, ops=0;
-  const kindCount = new Map();        // group => count
-  const productMove = new Map();      // productId => abs movement
-  const productMap = new Map(db.products.map(p=>[p.id,p]));
-
-  for(const op of db.ops){
-    if(!inRange(op)) continue;
-    ops++;
-    if(op.dir==="plus") plus += op.qty;
-    else minus += op.qty;
-
-    const g = kindGroup(op.kind);
-    kindCount.set(g, (kindCount.get(g)||0)+1);
-
-    const mv = Math.abs(op.qty);
-    productMove.set(op.productId, (productMove.get(op.productId)||0)+mv);
-  }
-
-  const net = plus - minus;
-
-  // KPI
-  $("rPlus").textContent = String(plus);
-  $("rMinus").textContent = String(minus);
-  $("rNet").textContent = String(net);
-  $("rOps").textContent = String(ops);
-
-  // Kinds list
-  const rk = $("rKinds");
-  rk.innerHTML = "";
-  const kindsSorted = [...kindCount.entries()].sort((a,b)=>b[1]-a[1]);
-  if(!kindsSorted.length){
-    const d=document.createElement("div");
-    d.className="item";
-    d.innerHTML = `<div class="muted">Bu aralıkta işlem yok.</div>`;
-    rk.appendChild(d);
-  }else{
-    for(const [k,c] of kindsSorted){
-      const el=document.createElement("div");
-      el.className="item";
-      el.innerHTML = `<div style="display:flex;justify-content:space-between;gap:10px">
-        <div style="font-weight:900">${k}</div>
-        <div class="tag">${c} işlem</div>
-      </div>`;
-      rk.appendChild(el);
-    }
-  }
-
-  // Top movers
-  const rt = $("rTop");
-  rt.innerHTML = "";
-  const top = [...productMove.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5);
-  if(!top.length){
-    const d=document.createElement("div");
-    d.className="item";
-    d.innerHTML = `<div class="muted">Hareket yok.</div>`;
-    rt.appendChild(d);
-  }else{
-    for(const [pid,mv] of top){
-      const p = productMap.get(pid);
-      const name = p ? p.name : "(silinmiş ürün)";
-      const el=document.createElement("div");
-      el.className="item";
-      el.innerHTML = `<div style="display:flex;justify-content:space-between;gap:10px">
-        <div style="font-weight:900">${name}</div>
-        <div class="tag">${mv} adet</div>
-      </div>`;
-      rt.appendChild(el);
-    }
-  }
-
-  // Range hint
-  const d0 = new Date(start);
-  const d1 = new Date(end);
-  const pad=n=>String(n).padStart(2,"0");
-  const f=(d)=>`${pad(d.getDate())}.${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  $("rRangeHint").textContent = `Aralık: ${f(d0)} → ${f(d1)} (${days} gün)`;
-}
-
-function reportToday(){
-  // “bugün” = gün başından şimdiye
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const end = Date.now();
-
-  let plus=0, minus=0, ops=0;
-  const kindCount = new Map();
-  const productMove = new Map();
-  const productMap = new Map(db.products.map(p=>[p.id,p]));
-  const inRange = (op)=> op.ts >= start && op.ts <= end;
-
-  for(const op of db.ops){
-    if(!inRange(op)) continue;
-    ops++;
-    if(op.dir==="plus") plus += op.qty;
-    else minus += op.qty;
-
-    const g = kindGroup(op.kind);
-    kindCount.set(g, (kindCount.get(g)||0)+1);
-
-    const mv = Math.abs(op.qty);
-    productMove.set(op.productId, (productMove.get(op.productId)||0)+mv);
-  }
-
-  $("rPlus").textContent = String(plus);
-  $("rMinus").textContent = String(minus);
-  $("rNet").textContent = String(plus - minus);
-  $("rOps").textContent = String(ops);
-
-  const rk = $("rKinds");
-  rk.innerHTML = "";
-  const kindsSorted = [...kindCount.entries()].sort((a,b)=>b[1]-a[1]);
-  if(!kindsSorted.length){
-    const d=document.createElement("div");
-    d.className="item";
-    d.innerHTML = `<div class="muted">Bugün işlem yok.</div>`;
-    rk.appendChild(d);
-  }else{
-    for(const [k,c] of kindsSorted){
-      const el=document.createElement("div");
-      el.className="item";
-      el.innerHTML = `<div style="display:flex;justify-content:space-between;gap:10px">
-        <div style="font-weight:900">${k}</div>
-        <div class="tag">${c} işlem</div>
-      </div>`;
-      rk.appendChild(el);
-    }
-  }
-
-  const rt = $("rTop");
-  rt.innerHTML = "";
-  const top = [...productMove.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5);
-  if(!top.length){
-    const d=document.createElement("div");
-    d.className="item";
-    d.innerHTML = `<div class="muted">Hareket yok.</div>`;
-    rt.appendChild(d);
-  }else{
-    for(const [pid,mv] of top){
-      const p = productMap.get(pid);
-      const name = p ? p.name : "(silinmiş ürün)";
-      const el=document.createElement("div");
-      el.className="item";
-      el.innerHTML = `<div style="display:flex;justify-content:space-between;gap:10px">
-        <div style="font-weight:900">${name}</div>
-        <div class="tag">${mv} adet</div>
-      </div>`;
-      rt.appendChild(el);
-    }
-  }
-
-  const pad=n=>String(n).padStart(2,"0");
-  const f=(d)=>`${pad(d.getDate())}.${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  $("rRangeHint").textContent = `Aralık: ${f(new Date(start))} → ${f(new Date(end))} (Bugün)`;
-}
-
 /* ====== TABS ====== */
 let tab="products"; // products | ops
 function setTab(t){
@@ -795,10 +581,6 @@ $("btnAddOp").onclick=()=>{
 $("inpSearch").addEventListener("input", ()=>renderOps());
 
 /* init */
-$("btnReportToday").onclick=()=>{ reportToday(); };
-$("btnReport7").onclick=()=>{ reportForDays(7); };
-$("btnReport30").onclick=()=>{ reportForDays(30); };
-
 ensureProductsSeed();
 setMode("plus");
 renderAll();
