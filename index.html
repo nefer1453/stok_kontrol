@@ -112,6 +112,36 @@
     .netstokWrap{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
     .netstokLabel{ font-size:12px; color:#64748b; font-weight:800; letter-spacing:.2px; }
     
+
+/* REPORT_MANAGER_V2 */
+.reportGrid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+@media (min-width:720px){
+  .reportGrid{grid-template-columns:repeat(3,minmax(0,1fr));}
+}
+.kpi{
+  border:1px solid rgba(148,163,184,.35);
+  border-radius:16px;
+  padding:12px;
+  background:rgba(255,255,255,.04);
+}
+.kpi .k{font-size:12px; opacity:.85}
+.kpi .v{font-size:22px; font-weight:900; margin-top:6px}
+.kpi .s{font-size:12px; opacity:.85; margin-top:6px; line-height:1.25}
+.reportTitle{font-size:18px; font-weight:950; margin:0 0 6px}
+.reportSub{font-size:12px; opacity:.85; margin:0 0 12px; line-height:1.35}
+.reportSectionTitle{font-weight:900; margin:14px 0 8px}
+.reportList{display:flex; flex-direction:column; gap:10px}
+.reportItem{border:1px solid rgba(148,163,184,.25); border-radius:14px; padding:12px}
+.reportItem .t{font-weight:900}
+.reportItem .m{font-size:12px; opacity:.85; margin-top:6px; line-height:1.25}
+.reportBadgeRow{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+.reportBadge{font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid rgba(148,163,184,.25); opacity:.95}
+.reportWarn{border-color: rgba(239,68,68,.45)}
+
 </style>
 
 <style id="detailStyle">
@@ -272,6 +302,8 @@
       <div id="listOps" class="list"></div>
     </section>
   </div>
+
+<div id="mgrReportV2" style="display:none"></div>
 </main>
 
 <nav class="bottomBar" aria-label="Alt menü">
@@ -1024,5 +1056,184 @@ function analyzeProduct(productId){
 
 </script>
 
+<script>
+
+/* REPORT_MANAGER_V2 */
+(function(){
+  function safeNum(x){ x=Number(x); return Number.isFinite(x)?x:0; }
+  function toTRDate(ts){ try{return new Date(ts).toLocaleString("tr-TR")}catch(_){return ""} }
+  function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+
+  function getDB(){
+    // Bu projede DB anahtarı farklı olabilir; global KEY varsa yakalarız.
+    // En risksiz: localStorage içinde "stok_kontrol" ile başlayan ilk key'i bul.
+    try{
+      const keys = Object.keys(localStorage||{});
+      let k = keys.find(k=>k==="stok_kontrol_v1") || keys.find(k=>k.startsWith("stok_kontrol_")) || keys.find(k=>k.includes("stok_kontrol"));
+      if(!k) return {key:null, db:{products:[], ops:[]}};
+      const raw = localStorage.getItem(k);
+      const db = JSON.parse(raw||"null") || {};
+      return {key:k, db};
+    }catch(_){
+      return {key:null, db:{products:[], ops:[]}};
+    }
+  }
+
+  function normalize(db){
+    // farklı sürümler için tolerans:
+    const products = db.products || db.items || [];
+    const ops = db.ops || db.operations || [];
+    return {products:Array.isArray(products)?products:[], ops:Array.isArray(ops)?ops:[]};
+  }
+
+  function summarize({products, ops}){
+    const now = Date.now();
+    const day = 24*60*60*1000;
+
+    const byRange = (ms)=> ops.filter(o => safeNum(o.ts||o.time||0) >= now - ms);
+
+    const last1d = byRange(1*day);
+    const last7d = byRange(7*day);
+    const last30d = byRange(30*day);
+
+    const countTypes = (arr)=>{
+      const m = {};
+      for(const o of arr){
+        const t = String(o.type || o.kind || "Bilinmiyor");
+        m[t] = (m[t]||0)+1;
+      }
+      return m;
+    };
+
+    const types30 = countTypes(last30d);
+
+    // Top ürünler (30g) — hareket sayısına göre
+    const prodMov = {};
+    for(const o of last30d){
+      const pid = o.pid || o.productId || o.itemId || "";
+      const name = String(o.pname || o.name || o.productName || "");
+      const key = pid || name || "Bilinmeyen";
+      prodMov[key] = prodMov[key] || {name: name||key, n:0};
+      prodMov[key].n += 1;
+    }
+    const topProducts = Object.values(prodMov).sort((a,b)=>b.n-a.n).slice(0,8);
+
+    // “Uyarılar”: negatif stok görünen ürün, aşırı iade/SKT vs.
+    // (stok hesabı projede farklı olabilir; sadece kaba kontrol)
+    const warns = [];
+    for(const p of products){
+      const stock = safeNum(p.stock ?? p.qty ?? p.net ?? 0);
+      if(stock < 0) warns.push(`Negatif stok: ${p.name||p.title||"Ürün"} (${stock})`);
+    }
+    // SKT / iade sayısı (30g)
+    const sktCount = safeNum(types30["SKT"]);
+    const iadeCount = safeNum(types30["İade"] || types30["IADE"] || types30["iade"]);
+    if(sktCount >= 10) warns.push(`SKT işlemi yüksek (30g): ${sktCount}`);
+    if(iadeCount >= 10) warns.push(`İade işlemi yüksek (30g): ${iadeCount}`);
+
+    return {
+      meta: { nowTR: new Date().toLocaleString("tr-TR"), prodCount: products.length, opsCount: ops.length },
+      kpi: {
+        ops1d: last1d.length,
+        ops7d: last7d.length,
+        ops30d: last30d.length,
+        types30,
+        topProducts,
+        warns
+      },
+      lastOps: ops.slice().sort((a,b)=>safeNum(b.ts||b.time||0)-safeNum(a.ts||a.time||0)).slice(0,8)
+    };
+  }
+
+  function mount(){
+    const host = document.getElementById("mgrReportV2");
+    if(!host) return;
+
+    const {db} = getDB();
+    const norm = normalize(db);
+    const sum = summarize(norm);
+
+    host.style.display = "block";
+    host.innerHTML = `
+      <div class="reportTitle">Yönetici Raporu</div>
+      <div class="reportSub">${esc(sum.meta.nowTR)} • Ürün: <b>${sum.meta.prodCount}</b> • İşlem: <b>${sum.meta.opsCount}</b>
+        <span style="opacity:.7"> (Bu özet son 30 gün ağırlıklı)</span>
+      </div>
+
+      <div class="reportGrid">
+        <div class="kpi">
+          <div class="k">Bugün işlem</div>
+          <div class="v">${sum.kpi.ops1d}</div>
+          <div class="s">Gün içi tempo göstergesi</div>
+        </div>
+        <div class="kpi">
+          <div class="k">7 gün işlem</div>
+          <div class="v">${sum.kpi.ops7d}</div>
+          <div class="s">Haftalık hareketlilik</div>
+        </div>
+        <div class="kpi">
+          <div class="k">30 gün işlem</div>
+          <div class="v">${sum.kpi.ops30d}</div>
+          <div class="s">Aylık hareketlilik</div>
+        </div>
+      </div>
+
+      <div class="reportSectionTitle">Tür dağılımı (30g)</div>
+      <div class="reportList">
+        ${Object.entries(sum.kpi.types30).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([t,n])=>`
+          <div class="reportItem">
+            <div class="t">${esc(t)}</div>
+            <div class="reportBadgeRow">
+              <span class="reportBadge">${n} işlem</span>
+            </div>
+          </div>
+        `).join("") || `<div class="reportItem"><div class="m">Kayıt yok.</div></div>`}
+      </div>
+
+      <div class="reportSectionTitle">En hareketli ürünler (30g)</div>
+      <div class="reportList">
+        ${sum.kpi.topProducts.map(p=>`
+          <div class="reportItem">
+            <div class="t">${esc(p.name)}</div>
+            <div class="reportBadgeRow">
+              <span class="reportBadge">${p.n} hareket</span>
+            </div>
+          </div>
+        `).join("") || `<div class="reportItem"><div class="m">Kayıt yok.</div></div>`}
+      </div>
+
+      <div class="reportSectionTitle">Uyarılar</div>
+      <div class="reportList">
+        ${(sum.kpi.warns||[]).map(w=>`
+          <div class="reportItem reportWarn">
+            <div class="t">Dikkat</div>
+            <div class="m">${esc(w)}</div>
+          </div>
+        `).join("") || `<div class="reportItem"><div class="m">Şimdilik belirgin uyarı yok.</div></div>`}
+      </div>
+
+      <div class="reportSectionTitle">Son işlemler</div>
+      <div class="reportList">
+        ${sum.lastOps.map(o=>`
+          <div class="reportItem">
+            <div class="t">${esc(o.type||o.kind||"İşlem")}</div>
+            <div class="m">${esc(o.pname||o.name||o.productName||"")} ${o.qty!=null?(" • adet: "+esc(o.qty)):""}</div>
+            <div class="reportBadgeRow">
+              <span class="reportBadge">${esc(toTRDate(o.ts||o.time||0))}</span>
+            </div>
+          </div>
+        `).join("") || `<div class="reportItem"><div class="m">İşlem yok.</div></div>`}
+      </div>
+    `;
+  }
+
+  // dışarıdan da çağrılabilsin (debug)
+  window.__SK_REPORT_V2__ = mount;
+
+  // Sayfa yüklenince bir kez dene (Rapor sekmesi yoksa bile zarar vermez)
+  window.addEventListener("load", ()=>{ try{ mount(); }catch(_){} }, {once:true});
+})();
+
+</script>
 </body>
 </html>
