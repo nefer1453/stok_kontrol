@@ -600,6 +600,51 @@ function renderAll(){
 }
 
 
+
+
+/* PERFORMANCE_SCORE_V1 */
+
+function calculatePerformance(productId, days=30){
+  const now = Date.now();
+  const since = now - (days * 86400000);
+
+  const ops = db.ops.filter(o => o.productId === productId && o.ts >= since);
+
+  let totalIn=0, totalOut=0, sales=0, returns=0, insertSales=0, insertDist=0;
+
+  for(const o of ops){
+    if(o.type==="in"){ totalIn += o.qty; }
+    if(o.type==="out"){ totalOut += o.qty; }
+
+    if(o.main==="satış"){ sales += o.qty; }
+    if(o.main==="iade"){ returns += o.qty; }
+
+    if(o.main==="satış" && o.sub && o.sub.includes("insert")){
+      insertSales += o.qty;
+    }
+
+    if(o.main==="dağılım" && o.sub && o.sub.includes("insert")){
+      insertDist += o.qty;
+    }
+  }
+
+  const net = totalIn - totalOut;
+
+  const sellRate = totalIn>0 ? (sales/totalIn) : 0;
+  const returnRate = sales>0 ? (returns/sales) : 0;
+  const insertEfficiency = insertDist>0 ? (insertSales/insertDist) : 0;
+
+  let score = 0;
+
+  score += sellRate * 40;
+  score += insertEfficiency * 30;
+  score += (1-returnRate) * 20;
+  score += (net<=0 ? 10 : 0);
+
+  return Math.round(score);
+}
+
+
 /* ====== REPORT (v1.2) ====== */
 function kindGroup(kind){
   if(kind.startsWith("siparis_")) return "Sipariş";
