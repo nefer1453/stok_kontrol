@@ -142,19 +142,6 @@
 .reportBadge{font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid rgba(148,163,184,.25); opacity:.95}
 .reportWarn{border-color: rgba(239,68,68,.45)}
 
-
-/* REPORT_COMPACT_V1 */
-:root{ --repMaxH: 220px; }
-.miniScroll{
-  max-height: var(--repMaxH);
-  overflow:auto;
-  -webkit-overflow-scrolling: touch;
-}
-.repCompactNote{ font-size:12px; color:#64748b; margin-top:6px; }
-@media (max-height: 740px){
-  :root{ --repMaxH: 180px; }
-}
-
 </style>
 
 <style id="detailStyle">
@@ -896,50 +883,6 @@ $("btnReport30").onclick=()=>{ reportForDays(30); };
 ensureProductsSeed();
 setMode("plus");
 renderAll();
-
-/* REPORT_COMPACT_V1_JS */
-(function(){
-  function apply(){
-    // Rapor içinde olma ihtimali yüksek listeleri yakala:
-    document.querySelectorAll(
-      '#report .list, #screenReport .list, #viewReport .list, .report .list, [id^="rep"] .list, [id^="repList"], [id^="rep"]'
-    ).forEach(el=>{
-      // sadece gerçekten uzun olabilecek bloklara uygula
-      if(el && el.classList && !el.classList.contains("miniScroll")){
-        // İçinde çok item varsa veya zaten "list" ise
-        const isListy = el.classList.contains("list") || el.querySelector(".item") || el.children.length >= 6;
-        if(isListy) el.classList.add("miniScroll");
-      }
-    });
-
-    // Rapor başına küçük not (varsa)
-    const rep = document.querySelector("#report, #screenReport, #viewReport, .report");
-    if(rep && !rep.querySelector(".repCompactNote")){
-      const note = document.createElement("div");
-      note.className = "repCompactNote";
-      note.textContent = "Rapor: uzun listeler bu kutunun içinde kayar (tek ekranda kalır).";
-      rep.prepend(note);
-    }
-  }
-
-  window.addEventListener("load", ()=>setTimeout(apply, 200));
-  document.addEventListener("click", ()=>setTimeout(apply, 50));
-  document.addEventListener("input", ()=>setTimeout(apply, 80));
-
-  // Eğer uygulamada render/yenileme fonksiyonu varsa yakalamaya çalış (zararsız)
-  try{
-    const oldRender = window.renderAll || window.render || null;
-    if(typeof oldRender === "function"){
-      const name = window.renderAll ? "renderAll" : "render";
-      window[name] = function(){
-        const r = oldRender.apply(this, arguments);
-        setTimeout(apply, 0);
-        return r;
-      };
-    }
-  }catch(_){}
-})();
-
 </script>
 
 <script>
