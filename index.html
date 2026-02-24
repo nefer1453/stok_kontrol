@@ -642,10 +642,17 @@ function calculatePerformance(productId, days=30){
 
   let score = 0;
 
+  
+  // SCORE_FIX_V1: Boş veri halinde skor şişmesin
+  // (satış yok, insert yok, iade yok, net 0) => skor 0
+  if((sellRate===0) && (insertEfficiency===0) && (returnRate===0) && (typeof net==="number") && (net===0)){
+    return 0;
+  }
+
   score += sellRate * 40;
   score += insertEfficiency * 30;
   score += (1-returnRate) * 20;
-  score += (net<=0 ? 10 : 0);
+  score += (net<0 ? 10 : 0);
 
   return Math.round(score);
 }
