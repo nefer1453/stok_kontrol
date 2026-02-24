@@ -1237,3 +1237,54 @@ function analyzeProduct(productId){
 </script>
 </body>
 </html>
+
+<!-- REPORT_COMPACT_V2 -->
+<script>
+(function(){
+
+  function findReportRoot(){
+    return document.querySelector('#screenReport, #report, [data-screen="report"]');
+  }
+
+  function compact(){
+    const root = findReportRoot();
+    if(!root) return;
+
+    const cards = root.querySelectorAll('.card');
+    if(cards.length < 3) return;
+
+    if(root.querySelector('#reportDetailsV2')) return;
+
+    const details = document.createElement('details');
+    details.id = "reportDetailsV2";
+
+    const summary = document.createElement('summary');
+    summary.innerText = "Detayları Aç / Kapat";
+    summary.style.fontWeight = "900";
+    summary.style.cursor = "pointer";
+    summary.style.padding = "12px";
+    summary.style.border = "1px solid #ddd";
+    summary.style.borderRadius = "12px";
+    summary.style.marginTop = "10px";
+    details.appendChild(summary);
+
+    const body = document.createElement('div');
+    body.style.maxHeight = "50vh";
+    body.style.overflow = "auto";
+    body.style.marginTop = "8px";
+
+    for(let i=2;i<cards.length;i++){
+      body.appendChild(cards[i]);
+    }
+
+    details.appendChild(body);
+    cards[1].after(details);
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    setTimeout(compact,300);
+  });
+
+})();
+</script>
+
