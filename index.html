@@ -201,6 +201,7 @@
 </button>
 
           <div class="hint">Özet ve “akıl” (bugün / 7 gün / 30 gün)</div>
+          <div class="hint" id="perfLine" style="margin-top:6px"></div>
         </div>
         <div class="row" style="gap:8px">
           <button id="btnReportToday" class="btn btnBLUE" type="button" style="padding:10px 12px;border-radius:14px">Bugün</button>
@@ -510,6 +511,15 @@ function addOperation(){
 
   renderAll();
 reportToday();
+/* PERF_LINE_V1 */
+try{
+  const el=document.getElementById("perfLine");
+  if(el){
+    const items=(db&&db.items)?db.items:[];
+    const active=items.filter(it=>calculatePerfScore(it.id,30)>0).length;
+    el.textContent="Performans (30g): aktif ürün "+active+"/"+items.length;
+  }
+}catch(e){}
   return {ok:true, msg:"İşlem eklendi."};
 }
 
@@ -658,6 +668,8 @@ function calculatePerformance(productId, days=30){
 }
 
 
+/* SAFE_LIMIT_V1 */
+function safeLimit(arr, n){ try{ return (arr||[]).slice(0, n); }catch(e){ return []; } }
 /* ====== REPORT (v1.2) ====== */
 function kindGroup(kind){
   if(kind.startsWith("siparis_")) return "Sipariş";
@@ -1013,6 +1025,46 @@ function calculateRiskScore(prodId){
   return Math.min(score,100);
 }
 
+/* PERF_SCORE_V1 */
+function calculatePerfScore(prodId, days=30){
+  // performans = aktivite + satış/sipariş dengesi + iade/skt cezası (0-100)
+  try{
+    const since = Date.now() - days*24*60*60*1000;
+    const ops = (db && db.ops) ? db.ops : [];
+    const last = ops.filter(o => o && o.pid===prodId && (o.ts||0) >= since);
+
+    if(last.length===0) return 0;
+
+    const hasSale   = last.some(o => o.t==="satış");
+    const hasOrder  = last.some(o => o.t==="sipariş");
+    const hasDist   = last.some(o => o.t==="dağılım");
+    const hasInsert = last.some(o => o.t==="dağılım" && o.sub==="insert");
+    const hasReturn = last.some(o => o.t==="iade");
+    const hasSkt    = last.some(o => o.t==="skt");
+
+    // Aktivite puanı (çok işlem = yüksek)
+    let score = Math.min(50, last.length * 5);
+
+    // Satış + sipariş dengesi (sadece satış varsa risk değil, ama "performans" sayılır)
+    if(hasSale) score += 20;
+    if(hasOrder) score += 15;
+    if(hasDist) score += 10;
+    if(hasInsert) score += 5;
+
+    // ceza
+    if(hasReturn) score -= 10;
+    if(hasSkt) score -= 15;
+
+    // alt sınır/üst sınır
+    if(score < 0) score = 0;
+    if(score > 100) score = 100;
+    return Math.round(score);
+  }catch(e){
+    return 0;
+  }
+}
+
+
 function renderRiskPanel(){
 
   if(!window.isManagerMode) return;
@@ -1035,8 +1087,7 @@ function renderRiskPanel(){
 
   for(const prod of db.items){
     const score = calculateRiskScore(prod.id);
-
-    if(score===0) continue;
+if(score===0){ /* stabil, listeye ekleme */ return; }
 
     let label="🟩 Düşük";
     if(score>=80) label="🟥 Yüksek";
