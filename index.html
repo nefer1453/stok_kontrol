@@ -97,7 +97,32 @@
     .tab.active{background:linear-gradient(180deg,rgba(37,99,235,.25),rgba(37,99,235,.10));border-color:rgba(37,99,235,.35)}
     .tab.warn{background:linear-gradient(180deg,rgba(245,158,11,.25),rgba(245,158,11,.10));border-color:rgba(245,158,11,.35)}
     .hidden{display:none !important}
-  </style>
+  
+/* REPORT_COMPACT_V2 */
+#cardReport{
+  /* Sayfayı uzatmasın: rapor kartı kendi içinde aksın */
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Rapor üst barı (başlık + butonlar) kart içinde sabit kalsın */
+#cardReport .row:first-of-type{
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--card, #fff);
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* Rapor içindeki boşlukları sıkılaştır */
+#cardReport .hint{ margin-top: 4px !important; }
+#cardReport .hr{ margin: 10px 0 !important; }
+#cardReport .pill{ padding: 8px 10px !important; border-radius: 14px !important; }
+#cardReport h2{ margin: 0 0 4px 0 !important; }
+
+</style>
 </head>
 <body>
 <header>
