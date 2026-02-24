@@ -122,6 +122,27 @@
 #cardReport .pill{ padding: 8px 10px !important; border-radius: 14px !important; }
 #cardReport h2{ margin: 0 0 4px 0 !important; }
 
+
+
+/* NET_EMPHASIS_V1 */
+.k.netBig { display:flex; align-items:baseline; gap:10px; }
+.k.netBig .label { opacity:.85; font-weight:800; }
+.k.netBig .netVal{
+  font-size: 28px;
+  font-weight: 950;
+  letter-spacing: .2px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  display:inline-flex;
+  align-items:center;
+  min-width: 64px;
+  justify-content:center;
+  box-shadow: 0 8px 22px rgba(0,0,0,.22);
+}
+.k.netBig .netVal.pos{ background: rgba(22,163,74,.16); color:#16a34a; border:1px solid rgba(22,163,74,.35); }
+.k.netBig .netVal.neg{ background: rgba(220,38,38,.16); color:#dc2626; border:1px solid rgba(220,38,38,.35); }
+.k.netBig .netVal.zero{ background: rgba(148,163,184,.12); color:#cbd5e1; border:1px solid rgba(148,163,184,.22); }
+
 </style>
 </head>
 <body>
@@ -215,7 +236,7 @@
       <div class="kpi">
         <div class="k">Artış: <b id="rPlus">0</b></div>
         <div class="k">Azalış: <b id="rMinus">0</b></div>
-        <div class="k">Net: <b id="rNet">0</b></div>
+        <div class="k netBig"><span class="label">Net</span><span id="rNet" class="netVal zero">0</span></div>
         <div class="k">İşlem: <b id="rOps">0</b></div>
       </div>
 
@@ -670,6 +691,17 @@ function calculatePerformance(productId, days=30){
 
 /* SAFE_LIMIT_V1 */
 function safeLimit(arr, n){ try{ return (arr||[]).slice(0, n); }catch(e){ return []; } }
+
+function setNetClass(net){
+  const el = $("rNet");
+  if(!el) return;
+  el.classList.remove("pos","neg","zero");
+  const n = Number(net||0);
+  if(n>0) el.classList.add("pos");
+  else if(n<0) el.classList.add("neg");
+  else el.classList.add("zero");
+}
+
 /* ====== REPORT (v1.2) ====== */
 function kindGroup(kind){
   if(kind.startsWith("siparis_")) return "Sipariş";
@@ -710,7 +742,8 @@ function reportForDays(days){
   $("rPlus").textContent = String(plus);
   $("rMinus").textContent = String(minus);
   $("rNet").textContent = String(net);
-  $("rOps").textContent = String(ops);
+  setNetClass(net);
+$("rOps").textContent = String(ops);
 
   // Kinds list
   const rk = $("rKinds");
@@ -792,7 +825,8 @@ function reportToday(){
   $("rPlus").textContent = String(plus);
   $("rMinus").textContent = String(minus);
   $("rNet").textContent = String(plus - minus);
-  $("rOps").textContent = String(ops);
+  setNetClass(plus - minus);
+$("rOps").textContent = String(ops);
 
   const rk = $("rKinds");
   rk.innerHTML = "";
