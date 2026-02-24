@@ -1,0 +1,22 @@
+# --- local backups / generated ---
+_backup/
+_backup*/
+*.bak.*
+index.html.BACKUP.*
+index.html.bak.*
+*.BACKUP.*
+*.tgz
+
+# --- local helper scripts ---
+patch_*.sh
+install*.sh
+push_link.sh
+step2_*.sh
+
+# --- captures ---
+*.mp4
+frame_*.png
+
+# --- misc ---
+.DS_Store
+Thumbs.db
