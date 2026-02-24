@@ -848,6 +848,79 @@ renderAll();
     }
   };
 })();
+
+
+/* BRAIN_V1 */
+function runBrainAnalysis(){
+
+  if(!window.isManagerMode) return;
+
+  const now = Date.now();
+  const DAY = 86400000;
+
+  let warnings = [];
+
+  for(const prod of db.items){
+
+    const ops = db.ops.filter(o=>o.productId===prod.id);
+    const stock = calculateStock(prod.id);
+
+    // 1) Negatif stok
+    if(stock < 0){
+      warnings.push("⚠ Negatif stok: " + prod.name);
+    }
+
+    // 2) 7 gündür hareket yok ama stok var
+    const last7 = ops.filter(o=> now - o.ts < 7*DAY);
+    if(stock > 0 && last7.length===0){
+      warnings.push("📦 7g hareketsiz stok: " + prod.name);
+    }
+
+    // 3) Satış var ama 14g sipariş yok
+    const last14 = ops.filter(o=> now - o.ts < 14*DAY);
+    const hasSale = last14.some(o=>o.type==="satış");
+    const hasOrder = last14.some(o=>o.type==="sipariş");
+    if(hasSale && !hasOrder){
+      warnings.push("📉 Satış var, sipariş yok: " + prod.name);
+    }
+
+    // 4) Insert dağılım var ama satış yok
+    const hasInsert = ops.some(o=>o.type==="dağılım" && o.subtype==="insert");
+    const hasAnySale = ops.some(o=>o.type==="satış");
+    if(hasInsert && !hasAnySale){
+      warnings.push("🎯 Insert var, satış yok: " + prod.name);
+    }
+  }
+
+  renderBrainWarnings(warnings);
+}
+
+function renderBrainWarnings(list){
+  let box = document.getElementById("brainWarnings");
+  if(!box){
+    const card = document.getElementById("cardReport");
+    if(!card) return;
+    box = document.createElement("div");
+    box.id="brainWarnings";
+    box.style.marginTop="14px";
+    box.style.padding="12px";
+    box.style.border="1px solid #e5e7eb";
+    box.style.borderRadius="14px";
+    box.style.background="#fff";
+    card.appendChild(box);
+  }
+
+  if(!list.length){
+    box.innerHTML="<b>🧠 Kritik Uyarı:</b><br>Temiz. Anomali yok.";
+    return;
+  }
+
+  box.innerHTML="<b>🧠 Kritik Uyarılar:</b><br>" + list.join("<br>");
+}
+
+setTimeout(runBrainAnalysis, 500);
+
+
 </script>
 
 </body>
