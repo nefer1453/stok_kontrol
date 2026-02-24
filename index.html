@@ -921,6 +921,83 @@ function renderBrainWarnings(list){
 setTimeout(runBrainAnalysis, 500);
 
 
+
+
+/* RISK_ENGINE_V1 */
+function calculateRiskScore(prodId){
+
+  const now = Date.now();
+  const DAY = 86400000;
+
+  const ops = db.ops.filter(o=>o.productId===prodId);
+  const stock = calculateStock(prodId);
+
+  let score = 0;
+
+  // Negatif stok = ağır ceza
+  if(stock < 0) score += 40;
+
+  // 7g hareketsiz stok
+  const last7 = ops.filter(o=> now - o.ts < 7*DAY);
+  if(stock > 0 && last7.length===0) score += 20;
+
+  // Satış var ama 14g sipariş yok
+  const last14 = ops.filter(o=> now - o.ts < 14*DAY);
+  const hasSale = last14.some(o=>o.type==="satış");
+  const hasOrder = last14.some(o=>o.type==="sipariş");
+  if(hasSale && !hasOrder) score += 25;
+
+  // Insert var satış yok
+  const hasInsert = ops.some(o=>o.type==="dağılım" && o.subtype==="insert");
+  const hasAnySale = ops.some(o=>o.type==="satış");
+  if(hasInsert && !hasAnySale) score += 15;
+
+  return Math.min(score,100);
+}
+
+function renderRiskPanel(){
+
+  if(!window.isManagerMode) return;
+
+  let box = document.getElementById("riskPanel");
+  if(!box){
+    const card = document.getElementById("cardReport");
+    if(!card) return;
+    box = document.createElement("div");
+    box.id="riskPanel";
+    box.style.marginTop="14px";
+    box.style.padding="12px";
+    box.style.border="1px solid #e5e7eb";
+    box.style.borderRadius="14px";
+    box.style.background="#fff";
+    card.appendChild(box);
+  }
+
+  let rows = [];
+
+  for(const prod of db.items){
+    const score = calculateRiskScore(prod.id);
+
+    if(score===0) continue;
+
+    let label="🟩 Düşük";
+    if(score>=80) label="🟥 Yüksek";
+    else if(score>=40) label="🟧 Orta";
+
+    rows.push(label + " ("+score+") — " + prod.name);
+  }
+
+  if(!rows.length){
+    box.innerHTML="<b>📊 Risk Panel:</b><br>Risk yok.";
+    return;
+  }
+
+  box.innerHTML="<b>📊 Risk Panel:</b><br>" + rows.join("<br>");
+}
+
+setTimeout(renderRiskPanel,700);
+
+
 </script>
 
 </body>
