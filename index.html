@@ -982,6 +982,76 @@ setTimeout(runBrainAnalysis, 500);
 
 
 /* RISK_ENGINE_V1 */
+
+/* DUAL_SCORES_V1 */
+/* Performans Skoru: 0-100 (satış/insert verimi/iade etkisi).
+   Not: Bu skor 'alarm' değil; hareket oldukça değişmesi beklenir. */
+function calculatePerformanceScore(prodId, days){
+  days = (days==null) ? 30 : days;
+  const now = Date.now();
+  const since = now - (days * 24 * 60 * 60 * 1000);
+
+  const ops = (db && db.ops) ? db.ops : [];
+  const prodOps = ops.filter(o => o && o.prodId===prodId && (o.ts||0) >= since);
+
+  // Tipleri yakalama (kayıt formatı değişken olabilir diye toleranslı)
+  defnorm = lambda x: (x or "").toString().toLowerCase()
+
+  let sales = 0;
+  let insertSales = 0;
+  let plusDist = 0;
+  let plusInsertDist = 0;
+  let plusOrder = 0;
+  let returns = 0;
+
+  for(const o of prodOps){
+    const t = ((o.type||o.mainType||o.kind||"") + "").toLowerCase();
+    const sub = ((o.sub||o.subType||o.detail||o.subkind||"") + "").toLowerCase();
+    const sign = (o.sign!=null) ? o.sign : (o.delta!=null ? (o.delta>=0? +1 : -1) : (o.isPlus===true ? +1 : (o.isMinus===true ? -1 : null)));
+    const qty = Math.abs(parseInt(o.qty!=null?o.qty:o.amount!=null?o.amount:o.n!=null?o.n:o.count!=null?o.count:0, 10) || 0);
+
+    const isSale = t.includes("sat") || sub.includes("sat");
+    const isDist = t.includes("dağ") || t.includes("dag") || sub.includes("dağ") || sub.includes("dag");
+    const isOrder = t.includes("sip") || sub.includes("sip");
+    const isReturn = t.includes("iade") || sub.includes("iade");
+
+    // sign yoksa: tür üzerinden tahmin (en güvenlisi değil ama çalışır)
+    const effSign = (sign!=null) ? sign : (isReturn or isSale ? -1 : +1);
+
+    if(isSale && effSign < 0){
+      sales += qty;
+      if(sub.includes("insert")) insertSales += qty;
+    }
+    if(isDist && effSign > 0){
+      plusDist += qty;
+      if(sub.includes("insert")) plusInsertDist += qty;
+    }
+    if(isOrder && effSign > 0){
+      plusOrder += qty;
+    }
+    if(isReturn && effSign < 0){
+      returns += qty;
+    }
+  }
+
+  // metrikler
+  const totalIn = plusDist + plusOrder;
+  const sellRate = sales / Math.max(1, totalIn);                    // 0..1+
+  const insertEff = insertSales / Math.max(1, plusInsertDist);       // 0..1+
+  const returnRate = returns / Math.max(1, (sales + returns));       // 0..1
+
+  // skor ağırlıkları (sade ama mantıklı)
+  let score = 0;
+  score += Math.min(1.2, sellRate) * 45;            // satış / giriş verimi
+  score += Math.min(1.2, insertEff) * 25;           // insert verimi
+  score += (1 - Math.min(1, returnRate)) * 20;      // iade düşükse iyi
+  score += (sales > 0 ? 10 : 0);                    // hiç satış yoksa bonus yok
+
+  // normalize
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  return score;
+}
+
 function calculateRiskScore(prodId){
 
   const now = Date.now();
@@ -1134,6 +1204,39 @@ setTimeout(renderRiskPanel,700);
   }else{
     hook();
   }
+})();
+
+
+/* DUAL_SCORES_V1: Score Test UI hook */
+(function(){
+  const btn = document.getElementById("btnScoreTest");
+  if(!btn) return;
+
+  btn.onclick = () => {
+    // seçili ürün yakala (projede farklı olabilir diye toleranslı)
+    let prodId = null;
+    const sel = document.getElementById("selProd") || document.getElementById("prodSel") || document.querySelector("select");
+    if(sel && sel.value) prodId = sel.value;
+
+    // fallback: ilk ürün
+    if(!prodId && db && db.items && db.items.length) prodId = db.items[0].id;
+
+    if(!prodId){
+      alert("Skor Test: ürün yok. Önce ürün ekle.");
+      return;
+    }
+
+    const perf30 = calculatePerformanceScore(prodId, 30);
+    const risk = (typeof calculateRiskScore === "function") ? calculateRiskScore(prodId) : null;
+
+    const msg =
+      "Skor Test OK ✅\n\n" +
+      "Ürün ID: " + prodId + "\n\n" +
+      "PERFORMANS (30g): " + perf30 + "\n" +
+      "RİSK: " + (risk==null ? "yok" : risk) + "\n\n" +
+      "Not: Performans hareketle değişir. Risk kritik yoksa 0 kalabilir.";
+    alert(msg);
+  };
 })();
 
 </script>
