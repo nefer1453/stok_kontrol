@@ -1,3 +1,24 @@
+set -e
+cd "$(dirname "$0")"
+
+# 1) klasör düzeni
+mkdir -p src
+
+# 2) gitignore (repo şişmesin)
+cat > .gitignore <<'GI'
+_backup/
+*.bak.*
+index.html.BACKUP*
+patch_*.sh
+apply_*.sh
+install*.sh
+.trigger*
+GI
+
+# 3) KAYNAK (tek gerçek) — şimdilik buraya koyuyoruz
+# Bundan sonra her geliştirmeyi src/app.html içinde yapacağız.
+if [ ! -f src/app.html ]; then
+cat > src/app.html <<'HTML'
 <!doctype html>
 <html lang="tr">
 <head>
@@ -206,3 +227,15 @@ document.addEventListener("DOMContentLoaded", ()=>{
 </script>
 </body>
 </html>
+HTML
+fi
+
+# 4) build çıktısı: şimdilik src/app.html aynen index.html oluyor
+cp -f src/app.html index.html
+
+# 5) push
+git add -A
+git commit -m "build: regenerate index.html" || true
+git push -u origin main
+
+echo "LINK (cache kır): https://nefer1453.github.io/stok_kontrol/?v=$(date +%s)"
