@@ -105,6 +105,18 @@
   font-weight:950;
 }
 
+
+/* V12_KOLI_MODE_MODAL_OPAQUE_V2 */
+#modal{background:rgba(0,0,0,.78) !important;}
+.modalCard{
+  background: var(--card) !important;
+  border: 1px solid var(--line) !important;
+  box-shadow: 0 18px 50px rgba(0,0,0,.55) !important;
+}
+.modeBtn{padding:10px 12px;border-radius:999px}
+.modeBtnOn{background:rgba(37,99,235,.22);border-color:rgba(37,99,235,.45)}
+.modeHint{color:var(--muted);font-size:12px;margin-top:6px}
+
 </style>
 </head>
 <body>
@@ -186,7 +198,7 @@
 
 <!-- MODAL -->
 <div id="modal" style="position:fixed;inset:0;display:none;z-index:9999;background:rgba(0,0,0,.6);padding:14px">
-  <div class="card" style="max-width:720px;margin:0 auto;max-height:85vh;overflow:auto">
+  <div class="card" modalCard style="max-width:720px;margin:0 auto;max-height:85vh;overflow:auto">
     <div class="row" style="justify-content:space-between;align-items:center">
       <div>
         <div class="name">İşlem Ekle</div>
@@ -199,7 +211,34 @@
 
     <div class="row">
       <select id="opProd"></select>
-      <input id="opQty" inputmode="numeric" placeholder="Adet (örn 3)" />
+
+      <div class="row" style="gap:8px">
+        <button class="btn modeBtn modeBtnOn" id="btnModeAdet" type="button">Adet</button>
+        <button class="btn modeBtn" id="btnModeKoli" type="button">Koli</button>
+      </div>
+    </div>
+
+    <!-- ADET MODU -->
+    <div id="wrapAdet">
+      <div class="row" style="margin-top:10px">
+        <input id="opQty" inputmode="numeric" placeholder="Adet (örn 3)" />
+      </div>
+      <div class="hint">Hızlı adet</div>
+      <div class="miniRow" id="quickQtyRow"></div>
+    </div>
+
+    <!-- KOLİ MODU -->
+    <div id="wrapKoli" style="display:none">
+      <div class="row" style="margin-top:10px">
+        <input id="opPackCount" inputmode="numeric" placeholder="Koli sayısı (örn 2)" />
+        <input id="opPackSize" inputmode="numeric" placeholder="Koli içi adet (örn 12)" />
+      </div>
+
+      <div class="hint">Hızlı koli sayısı</div>
+      <div class="miniRow" id="quickPackRow"></div>
+
+      <div class="modeHint">Toplam adet: <b id="opPackTotal">0</b> (koli×iç adet)</div>
+      <div class="modeHint">Not: Koli içi adet girersen sistem bunu bu ürüne hatırlar.</div>
     </div>
 
     <div class="hint">Hızlı adet / koli</div>
@@ -236,6 +275,7 @@
 /* FAST_OPS_V1 */
 /* MODAL_ONEHAND_V1 */
 /* QUICK_QTY_V1 */
+/* V12_KOLI_MODE_MODAL_OPAQUE_V2 */
 /* ====== CORE DB ====== */
 const KEY="stok_kontrol_db_v1";
 const $=id=>document.getElementById(id);
@@ -293,6 +333,88 @@ const TYPE_DEF = [
     "Raf kaynaklı"
   ]},
 ];
+
+/* V12_KOLI_MODE_MODAL_OPAQUE_V2 */
+let OP_MODE = "adet"; // "adet" | "koli"
+
+function setMode(mode){
+  OP_MODE = mode;
+
+  const bA = $("btnModeAdet"), bK = $("btnModeKoli");
+  const wA = $("wrapAdet"), wK = $("wrapKoli");
+  if(!bA||!bK||!wA||!wK) return;
+
+  if(mode==="adet"){
+    bA.classList.add("modeBtnOn");
+    bK.classList.remove("modeBtnOn");
+    wA.style.display="";
+    wK.style.display="none";
+    setTimeout(()=>{ try{$("opQty").focus({preventScroll:true});}catch(e){} }, 60);
+  }else{
+    bK.classList.add("modeBtnOn");
+    bA.classList.remove("modeBtnOn");
+    wK.style.display="";
+    wA.style.display="none";
+    syncPackDefaultsFromProduct();
+    buildQuickPackRow();
+    updatePackTotal();
+    setTimeout(()=>{ try{$("opPackCount").focus({preventScroll:true});}catch(e){} }, 60);
+  }
+}
+
+function updatePackTotal(){
+  const c = parseInt(($("opPackCount")?.value || "0").trim(), 10) || 0;
+  const s = parseInt(($("opPackSize")?.value  || "0").trim(), 10) || 0;
+  const tot = Math.max(0, c) * Math.max(0, s);
+  const out = $("opPackTotal");
+  if(out) out.textContent = String(tot);
+}
+
+function buildQuickPackRow(){
+  const wrap = $("quickPackRow");
+  if(!wrap) return;
+  wrap.innerHTML="";
+  const presets=[1,2,3,4,5];
+  for(const n of presets){
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="btn smallBtn";
+    b.textContent=String(n)+" koli";
+    b.addEventListener("click", ()=>{
+      $("opPackCount").value = String(n);
+      updatePackTotal();
+      try{$("opPackCount").focus({preventScroll:true});}catch(e){}
+    });
+    wrap.appendChild(b);
+  }
+}
+
+function syncPackDefaultsFromProduct(){
+  const db = loadDB();
+  const pid = $("opProd")?.value;
+  if(!pid) return;
+  const prod = db.products.find(x=>x.id===pid);
+  if(!prod) return;
+
+  if(prod.packDefault && !String($("opPackSize")?.value||"").trim()){
+    $("opPackSize").value = String(prod.packDefault);
+  }
+}
+
+function learnPackDefaultToProduct(packSize){
+  const n = parseInt(String(packSize||"").trim(),10) || 0;
+  if(n<=0) return;
+
+  const db = loadDB();
+  const pid = $("opProd")?.value;
+  if(!pid) return;
+  const prod = db.products.find(x=>x.id===pid);
+  if(!prod) return;
+
+  prod.packDefault = n;
+  saveDB(db);
+}
+
 
 function computeStock(db, pid){
   let net=0;
@@ -613,6 +735,9 @@ function quickOp(pid, dir, qty){
     sub:(lc.sub||""),
     note:"",
     qty:qty,
+    unitMode: OP_MODE,
+    packCount: packCount,
+    packSize: packSize,
     ts:Date.now(),
     day: todayISO()
   });
@@ -677,7 +802,10 @@ function openModal(pid, dirHint){
 
 
   $("opQty").value="";
+  if($("opPackCount")) $("opPackCount").value="";
+  if($("opPackSize")) $("opPackSize").value="";
   $("opNote").value="";
+  try{ setMode("adet"); }catch(e){}
   // flicker öldürmek için agresif autofocus yok:
   setTimeout(()=>{ try{$("opQty").focus({preventScroll:true});}catch(e){} }, 60);
 }
@@ -699,9 +827,29 @@ function addProduct(){
 
 function addOp(){
   const pid=$("opProd").value;
-  const qty=Math.abs(parseInt(($("opQty").value||"").trim(),10))||0;
+  let qty = 0;
+  let packCount = 0;
+  let packSize = 0;
+
+  if(OP_MODE==="adet"){
+    qty = Math.abs(parseInt(($("opQty").value||"").trim(),10))||0;
+  }else{
+    packCount = Math.abs(parseInt(($("opPackCount").value||"").trim(),10))||0;
+    packSize  = Math.abs(parseInt(($("opPackSize").value||"").trim(),10))||0;
+    qty = packCount * packSize;
+    if(packSize>0) learnPackDefaultToProduct(packSize);
+  }
   if(!pid){ alert("Ürün seç."); return; }
-  if(!qty){ alert("Adet gir (örn 3)."); $("opQty").focus(); return; }
+  if(!qty){
+    if(OP_MODE==="adet"){
+      alert("Adet gir (örn 3).");
+      $("opQty").focus();
+    }else{
+      alert("Koli sayısı ve koli içi adet gir (örn 2 koli × 12).");
+      try{$("opPackCount").focus();}catch(e){}
+    }
+    return;
+  }
 
   const tKey=$("opType").value;
   const t=TYPE_DEF.find(x=>x.k===tKey);
@@ -720,6 +868,9 @@ function addOp(){
     sub:sub,
     note:note,
     qty:qty,
+    unitMode: OP_MODE,
+    packCount: packCount,
+    packSize: packSize,
     ts:Date.now(),
     day: todayISO()
   });
@@ -859,6 +1010,24 @@ $("btnSkorTest").onclick=()=>{
   reportToday();
   // agresif autofocus yok: flicker riskini azaltır
 })();
+
+/* V12_BINDINGS */
+document.addEventListener("DOMContentLoaded", ()=>{
+  if($("btnModeAdet")) $("btnModeAdet").onclick = ()=> setMode("adet");
+  if($("btnModeKoli")) $("btnModeKoli").onclick = ()=> setMode("koli");
+
+  if($("opPackCount")) $("opPackCount").addEventListener("input", updatePackTotal);
+  if($("opPackSize"))  $("opPackSize").addEventListener("input", updatePackTotal);
+
+  if($("opProd")) $("opProd").addEventListener("change", ()=>{
+    if(OP_MODE==="koli") syncPackDefaultsFromProduct();
+    updatePackTotal();
+  });
+
+  // açılışta adet modu
+  try{ setMode("adet"); }catch(e){}
+});
+
 </script>
 </body>
 </html>
