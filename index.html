@@ -64,7 +64,40 @@
     #cardReport .hr{margin:10px 0}
     /* ERROR_GUARD */
     #errorGuardBox{position:fixed;left:0;right:0;bottom:0;background:#7f1d1d;color:#fff;padding:12px;font-size:12px;display:none;z-index:99999;max-height:40vh;overflow:auto;border-top:2px solid #ef4444}
-  </style>
+  
+/* MODAL_ONEHAND_V1 */
+#modal .card{
+  position:relative;
+}
+#modal .onehandBar{
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: rgba(11,18,32,.92);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding-top: 10px;
+  padding-bottom: 10px;
+  margin-top: 12px;
+}
+#modal .onehandBar .btn{ width: 100%; padding: 14px 16px; border-radius: 18px; }
+#modal .fastTypeRow{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+#modal .fastTypeRow .btn{
+  padding:10px 12px;
+  border-radius: 999px;
+  font-weight: 900;
+}
+#modal #opQty{
+  font-size: 16px;
+  font-weight: 900;
+}
+
+</style>
 </head>
 <body>
 <header>
@@ -163,6 +196,9 @@
 
     <div class="miniRow" id="qtyRow" style="margin-top:8px"></div>
 
+    <div class="hint">Hızlı tür (tek dokunuş)</div>
+    <div class="fastTypeRow" id="fastTypeRow"></div>
+
     <div class="row">
       <select id="opType"></select>
       <select id="opSub"></select>
@@ -172,7 +208,7 @@
       <input id="opNote" placeholder="Not (opsiyonel)" />
     </div>
 
-    <div class="row" style="justify-content:flex-end">
+    <div class="onehandBar">
       <button class="btn btnOK" id="btnSaveOp" type="button">Kaydet</button>
     </div>
 
@@ -186,6 +222,7 @@
 
 <script>
 /* FAST_OPS_V1 */
+/* MODAL_ONEHAND_V1 */
 /* ====== CORE DB ====== */
 const KEY="stok_kontrol_db_v1";
 const $=id=>document.getElementById(id);
@@ -529,6 +566,53 @@ function openModal(pid, dirHint){
   if(pid) $("opProd").value=pid;
   fillTypeSelect(dirHint);
 
+  // MODAL_ONEHAND_V1: son seçimleri geri yükle
+  try{
+    const db=loadDB();
+    const lc = (db.meta && db.meta.lastChoice) ? db.meta.lastChoice[dirHint] : null;
+
+    // pid yoksa son ürünü seç
+    if(!pid && db.meta && db.meta.lastPid){
+      const lp = db.meta.lastPid;
+      if($("opProd") && [...$("opProd").options].some(o=>o.value===lp)) $("opProd").value = lp;
+    }
+
+    // tür/sub otomatik (dirHint'e göre)
+    if(lc && lc.typeKey){
+      if($("opType") && [...$("opType").options].some(o=>o.value===lc.typeKey)){
+        $("opType").value = lc.typeKey;
+        fillSubSelect();
+        if(lc.sub) $("opSub").value = lc.sub;
+        buildQuickRow();
+      }
+    }
+  }catch(e){}
+
+  // MODAL_ONEHAND_V1: hızlı tür butonları
+  try{
+    const row=$("fastTypeRow");
+    if(row){
+      row.innerHTML="";
+      const dir=dirHint; // "+" veya "-"
+      const list = TYPE_DEF.filter(t=>!dir || t.dir===dir);
+      for(const t of list){
+        const b=document.createElement("button");
+        b.type="button";
+        b.className="btn smallBtn " + (t.dir==="+" ? "btnOK" : "btnBAD");
+        // kısa isim:
+        const short = t.label.replace(" (+)","").replace(" (-)","").trim();
+        b.textContent = (t.dir==="+"?"+ ":"- ") + short;
+        b.addEventListener("click", ()=>{
+          $("opType").value = t.k;
+          fillSubSelect();
+          buildQuickRow();
+        });
+        row.appendChild(b);
+      }
+    }
+  }catch(e){}
+
+
   $("opQty").value="";
   $("opNote").value="";
   // flicker öldürmek için agresif autofocus yok:
@@ -584,6 +668,13 @@ function addOp(){
     const dir = t.dir; // "+" / "-"
     db.meta.lastChoice[dir] = { typeKey: t.k, sub: sub || "" };
   }catch(e){}
+
+  // MODAL_ONEHAND_V1: son ürün (pid) hafızası
+  try{
+    if(!db.meta) db.meta={v:1};
+    db.meta.lastPid = pid;
+  }catch(e){}
+
 saveDB(db);
   closeModal();
   renderProducts();
