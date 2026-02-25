@@ -265,7 +265,7 @@ function renderProducts(){
   if(!filtered.length){
     list.innerHTML = `<div class="item"><div class="hint">Ürün yok / arama sonucu boş.</div></div>`;
     fillProdSelect(); // modal select güncel kalsın
-    renderReport("today");
+    reportToday();
     return;
   }
 
@@ -305,7 +305,7 @@ function renderProducts(){
   });
 
   fillProdSelect();
-  renderReport("today");
+  reportToday();
 }
 
 function escapeHTML(s){
