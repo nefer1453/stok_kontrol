@@ -1,137 +1,92 @@
 set -e
 
-cd "$(dirname "$0")"
 ts=$(date +%Y%m%d_%H%M%S)
-cp -f index.html "index.html.bak.$ts"
+cp -f index.html "index.html.bak.$ts" 2>/dev/null || true
 
 python - <<'PY'
 from pathlib import Path
+import re
 
-p = Path("index.html")
-s = p.read_text(encoding="utf-8")
+p=Path("index.html")
+s=p.read_text(encoding="utf-8")
 
-# 1) CSS ekle (yoksa)
-css_mark = "/* REPORT_COMPACT_V1 */"
-if css_mark not in s:
-    s = s.replace("</head>", f"""
-<style>
-{css_mark}
-#reportDetailsV1 {{
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 10px 12px;
-  margin-top: 12px;
-  background: #fff;
-}}
-#reportDetailsV1 > summary {{
-  list-style: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-weight: 900;
-  user-select: none;
-}}
-#reportDetailsV1 > summary::-webkit-details-marker {{ display:none; }}
-#reportDetailsV1 .hint {{ color:#64748b; font-size:12px; font-weight:600; }}
-#reportDetailsV1[open] {{ box-shadow: 0 8px 20px rgba(0,0,0,.06); }}
-#reportDetailsV1 .detailsBody {{
-  margin-top: 10px;
-  max-height: 52vh;          /* ekranı uzatmasın */
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-right: 4px;
-}}
-</style>
-</head>""")
+# 1) Report ekranını (yönetici bakışı) tek kartta toplamak için küçük CSS ekleyelim
+if "/* REPORT_COMPACT_V1 */" not in s:
+    s = s.replace("</style>", """
+/* REPORT_COMPACT_V1 */
+.reportGrid{display:grid;gap:10px}
+@media (min-width:520px){ .reportGrid{grid-template-columns:1fr 1fr} }
+.reportKpi{display:flex;gap:8px;flex-wrap:wrap}
+.reportKpi .pill{font-weight:900}
+.reportSectionTitle{font-weight:950;margin:6px 0 2px 0}
+</style>""")
 
-# 2) JS ekle (yoksa) — rapor ekranındaki kartları "Detaylar" içine toplar
-js_mark = "/* REPORT_COMPACT_JS_V1 */"
-if js_mark not in s:
-    insert = "</body>"
-    if insert not in s:
-        raise SystemExit("HATA: </body> yok. index.html beklenenden farklı.")
-    s = s.replace(insert, f"""
-<script>
-{js_mark}
-(function(){
-  function txt(el){ return (el && (el.textContent||"").trim()) || ""; }
+# 2) HTML tarafında "Rapor" alanını bulup (varsa) kompakt bir wrapper ekle.
+# Not: Projede rapor alanı farklı isimde olabilir. O yüzden "id=report" / "Rapor" etiketlerini yakalıyoruz.
+# En güvenlisi: var olan rapor container'ının içeriğini bozmadan içine wrapper koymak.
+patterns = [
+    r'(<div[^>]*id="report"[^>]*>)(.*?)</div>\s*<!--\s*/report\s*-->',
+    r'(<section[^>]*id="report"[^>]*>)(.*?)</section>'
+]
 
-  function findReportRoot(){
-    // En olası id'ler / data-screen
-    let r = document.querySelector('[data-screen="report"], #screenReport, #report, #rapor');
-    if(r) return r;
+done=False
+for pat in patterns:
+    m=re.search(pat, s, flags=re.S|re.I)
+    if not m:
+        continue
+    head=m.group(1)
+    body=m.group(2)
 
-    // Başlık metninden yakala
-    const heads = Array.from(document.querySelectorAll("h1,h2,h3,div,strong"));
-    const hit = heads.find(x => /rapor/i.test(txt(x)));
-    if(!hit) return null;
+    # Zaten kompakt yapılmışsa dokunma
+    if "reportGrid" in body and "REPORT_COMPACT_V1" in s:
+        done=True
+        break
 
-    // En yakın "screen/page/main" gibi bir kapsayıcıyı seç
-    return hit.closest("[data-screen], .screen, main, body") || null;
-  }
+    new_body = f"""
+<div class="reportSectionTitle">Yönetici Özeti</div>
+<div class="reportKpi" id="reportKpi"></div>
+<div class="hr"></div>
+<div class="reportGrid">
+  <div class="card" style="margin:0">
+    <div class="reportSectionTitle">Bugün / 7g / 30g</div>
+    <div id="reportWindow"></div>
+  </div>
+  <div class="card" style="margin:0">
+    <div class="reportSectionTitle">En Çok Ürünler</div>
+    <div id="reportTop"></div>
+  </div>
+</div>
+<div class="hr"></div>
+<div class="reportGrid">
+  <div class="card" style="margin:0">
+    <div class="reportSectionTitle">Tür Dağılımı</div>
+    <div id="reportTypes"></div>
+  </div>
+  <div class="card" style="margin:0">
+    <div class="reportSectionTitle">Notlar / Akıl</div>
+    <div id="reportBrain"></div>
+  </div>
+</div>
+"""
+    # body içindeki eski elemanları aynen bırakıp sadece bir "kompakt hedef alan" oluşturuyoruz.
+    # JS tarafı bu id'lere yazabiliyorsa zaten otomatik dolacak.
+    # Yazamıyorsa da en azından UI bozulmaz.
+    body2 = new_body + "\n" + body
 
-  function compactReport(){
-    const root = findReportRoot();
-    if(!root) return;
+    s = s[:m.start()] + head + body2 + s[m.end():]
+    done=True
+    break
 
-    // Kartları topla
-    const cards = Array.from(root.querySelectorAll(".card"));
-    if(cards.length < 3) return; // zaten kısa
-
-    // Zaten uygulanmış mı?
-    if(root.querySelector("#reportDetailsV1")) return;
-
-    // İlk 1-2 kart kalsın (özet gibi). Gerisini detaylara al.
-    const keep = cards.slice(0, 2);
-    const move = cards.slice(2);
-
-    const details = document.createElement("details");
-    details.id = "reportDetailsV1";
-    details.open = false;
-
-    const summary = document.createElement("summary");
-    summary.innerHTML = '<span>Detaylar</span><span class="hint">Aç / Kapat</span>';
-    details.appendChild(summary);
-
-    const body = document.createElement("div");
-    body.className = "detailsBody";
-    details.appendChild(body);
-
-    // Detay kartlarını taşı
-    for(const c of move){
-      body.appendChild(c);
-    }
-
-    // Detayları, özetin hemen altına yerleştir
-    const after = keep[keep.length-1];
-    after.insertAdjacentElement("afterend", details);
-  }
-
-  // İlk yükleme + ekran değişimi ihtimaline karşı birkaç kez dene
-  function run(){
-    try{ compactReport(); }catch(_){}
-  }
-  document.addEventListener("DOMContentLoaded", run);
-  setTimeout(run, 200);
-  setTimeout(run, 700);
-  setTimeout(run, 1400);
-
-  // Basit mutation watcher: UI ekran değiştiriyorsa yakalasın
-  const mo = new MutationObserver(()=>run());
-  mo.observe(document.documentElement, {subtree:true, childList:true});
-})();
-</script>
-</body>""")
-
-p.write_text(s, encoding="utf-8")
-print("OK: Rapor kompakt modu eklendi (Detaylar kapağı). Yedek:", f"index.html.bak.{__import__('time').strftime('%Y%m%d_%H%M%S')}")
+if not done:
+    # Rapor alanı bulunamadıysa güvenli şekilde hiç dokunma.
+    print("UYARI: report alanı bulunamadı. Dosyaya dokunulmadı.")
+else:
+    p.write_text(s, encoding="utf-8")
+    print("OK: Rapor kompakt yerleşime alındı (REPORT_COMPACT_V1).")
 PY
 
 git add index.html
-git commit -m "UI: rapor tek ekrana (Detaylar kapağı)" || true
+git commit -m "UI: report compact (tek ekrana toplama)" || true
 git push -u origin main
 
-echo
 echo "LINK (cache kır): https://nefer1453.github.io/stok_kontrol/?v=$(date +%s)"
