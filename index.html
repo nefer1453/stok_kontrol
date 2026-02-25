@@ -97,6 +97,14 @@
   font-weight: 900;
 }
 
+
+/* QUICK_QTY_V1 */
+#quickQtyRow .btn{
+  padding:10px 12px;
+  border-radius:999px;
+  font-weight:950;
+}
+
 </style>
 </head>
 <body>
@@ -194,6 +202,10 @@
       <input id="opQty" inputmode="numeric" placeholder="Adet (örn 3)" />
     </div>
 
+    <div class="hint">Hızlı adet / koli</div>
+    <div class="miniRow" id="quickQtyRow"></div>
+
+
     <div class="miniRow" id="qtyRow" style="margin-top:8px"></div>
 
     <div class="hint">Hızlı tür (tek dokunuş)</div>
@@ -223,6 +235,7 @@
 <script>
 /* FAST_OPS_V1 */
 /* MODAL_ONEHAND_V1 */
+/* QUICK_QTY_V1 */
 /* ====== CORE DB ====== */
 const KEY="stok_kontrol_db_v1";
 const $=id=>document.getElementById(id);
@@ -463,6 +476,55 @@ function buildQuickRow(){
   }
 }
 
+/* QUICK_QTY_V1 */
+function buildQuickQtyRow(){
+  const wrap = $("quickQtyRow");
+  if(!wrap) return;
+  wrap.innerHTML="";
+
+  const presets = [1,2,3,5,6,10,12,15,20];
+
+  for(const n of presets){
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="btn smallBtn";
+    b.textContent = String(n);
+    b.title = "Adet = " + n;
+    b.addEventListener("click", ()=>{
+      $("opQty").value = String(n);
+      try{$("opQty").focus({preventScroll:true});}catch(e){}
+    });
+    wrap.appendChild(b);
+  }
+
+  // küçük düzeltme: -1 / +1
+  const bMinus=document.createElement("button");
+  bMinus.type="button";
+  bMinus.className="btn smallBtn btnBAD";
+  bMinus.textContent="-1";
+  bMinus.title="Adet -1";
+  bMinus.addEventListener("click", ()=>{
+    const cur = parseInt(($("opQty").value||"0").trim(),10) || 0;
+    const next = Math.max(0, cur-1);
+    $("opQty").value = String(next);
+    try{$("opQty").focus({preventScroll:true});}catch(e){}
+  });
+  wrap.appendChild(bMinus);
+
+  const bPlus=document.createElement("button");
+  bPlus.type="button";
+  bPlus.className="btn smallBtn btnOK";
+  bPlus.textContent="+1";
+  bPlus.title="Adet +1";
+  bPlus.addEventListener("click", ()=>{
+    const cur = parseInt(($("opQty").value||"0").trim(),10) || 0;
+    $("opQty").value = String(cur+1);
+    try{$("opQty").focus({preventScroll:true});}catch(e){}
+  });
+  wrap.appendChild(bPlus);
+}
+
+
 
 /* FAST_OPS_V1 */
 function showToast(msg){
@@ -565,6 +627,7 @@ function openModal(pid, dirHint){
   fillProdSelect();
   if(pid) $("opProd").value=pid;
   fillTypeSelect(dirHint);
+  try{ buildQuickQtyRow(); }catch(e){}
 
   // MODAL_ONEHAND_V1: son seçimleri geri yükle
   try{
