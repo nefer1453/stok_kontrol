@@ -161,6 +161,8 @@
       <input id="opQty" inputmode="numeric" placeholder="Adet (örn 3)" />
     </div>
 
+    <div class="miniRow" id="qtyRow" style="margin-top:8px"></div>
+
     <div class="row">
       <select id="opType"></select>
       <select id="opSub"></select>
@@ -183,6 +185,7 @@
 <div id="errorGuardBox"><b>Sistem Hatası:</b><br><div id="errorGuardText"></div></div>
 
 <script>
+/* FAST_OPS_V1 */
 /* ====== CORE DB ====== */
 const KEY="stok_kontrol_db_v1";
 const $=id=>document.getElementById(id);
@@ -285,6 +288,8 @@ function renderProducts(){
       </div>
       <div class="miniRow">
         <span class="tag">Net: <b>${net}</b></span>
+        <button class="btn smallBtn" data-act="qplus" data-pid="${p.id}" type="button">+1</button>
+        <button class="btn smallBtn" data-act="qminus" data-pid="${p.id}" type="button">-1</button>
         <button class="btn smallBtn btnOK" data-act="plus" data-pid="${p.id}" type="button">+ İşlem</button>
         <button class="btn smallBtn btnBAD" data-act="minus" data-pid="${p.id}" type="button">- İşlem</button>
         <button class="btn smallBtn" data-act="hist" data-pid="${p.id}" type="button">Geçmiş</button>
@@ -300,6 +305,8 @@ function renderProducts(){
       const act=btn.getAttribute("data-act");
       const pid=btn.getAttribute("data-pid");
       if(act==="hist"){ toggleHistory(pid); return; }
+      if(act==="qplus"){ quickOp(pid, "+", 1); return; }
+      if(act==="qminus"){ quickOp(pid, "-", 1); return; }
       openModal(pid, act==="plus" ? "+" : "-");
     });
   });
@@ -419,6 +426,103 @@ function buildQuickRow(){
   }
 }
 
+
+/* FAST_OPS_V1 */
+function showToast(msg){
+  let t=document.getElementById("toastBox");
+  if(!t){
+    t=document.createElement("div");
+    t.id="toastBox";
+    t.style.position="fixed";
+    t.style.left="50%";
+    t.style.bottom="72px";
+    t.style.transform="translateX(-50%)";
+    t.style.background="rgba(2,6,23,.92)";
+    t.style.border="1px solid rgba(255,255,255,.12)";
+    t.style.color="#e5e7eb";
+    t.style.padding="10px 12px";
+    t.style.borderRadius="14px";
+    t.style.fontSize="12px";
+    t.style.zIndex="99998";
+    t.style.display="none";
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  t.style.display="block";
+  clearTimeout(window.__toastT);
+  window.__toastT=setTimeout(()=>{ t.style.display="none"; }, 1200);
+}
+
+function buildQtyRow(){
+  const wrap=$("qtyRow");
+  if(!wrap) return;
+  wrap.innerHTML="";
+  const nums=[1,2,3,5,10];
+  for(const n of nums){
+    const b=document.createElement("button");
+    b.className="btn smallBtn";
+    b.type="button";
+    b.textContent=String(n);
+    b.addEventListener("click", ()=>{
+      $("opQty").value=String(n);
+      try{ $("opQty").focus({preventScroll:true}); }catch(e){}
+    });
+    wrap.appendChild(b);
+  }
+  // Enter = kaydet (modal içindeyken)
+  const q=$("opQty");
+  if(q && !q.__fastBound){
+    q.__fastBound=true;
+    q.addEventListener("keydown", (e)=>{
+      if(e.key==="Enter"){ e.preventDefault(); addOp(); }
+    });
+  }
+}
+
+// modal her açıldığında qty row hazır olsun
+const __openModal0 = openModal;
+openModal = function(pid, dirHint){
+  __openModal0(pid, dirHint);
+  buildQtyRow();
+};
+
+// Kart üstü +1 / -1 hızlı işlem
+function quickOp(pid, dir, qty){
+  const db=loadDB();
+  const lc = (db.meta && db.meta.lastChoice) ? db.meta.lastChoice[dir] : null;
+
+  // İlk kezse: kullanıcıya modal açtırıp “şablonu öğret”
+  if(!lc || !lc.typeKey){
+    showToast("İlk kez: tür seçelim");
+    openModal(pid, dir);
+    return;
+  }
+
+  const t=TYPE_DEF.find(x=>x.k===lc.typeKey && x.dir===dir);
+  if(!t){
+    showToast("Şablon yok: tür seçelim");
+    openModal(pid, dir);
+    return;
+  }
+
+  db.ops.push({
+    id:uid(),
+    pid,
+    dir:t.dir,
+    type:t.k,
+    typeLabel:t.label,
+    sub:(lc.sub||""),
+    note:"",
+    qty:qty,
+    ts:Date.now(),
+    day: todayISO()
+  });
+  saveDB(db);
+  renderProducts();
+  showToast((dir==="+"?"+":"-")+qty+" kaydedildi");
+}
+
+
 function openModal(pid, dirHint){
   $("modal").style.display="block";
   fillProdSelect();
@@ -472,7 +576,15 @@ function addOp(){
     ts:Date.now(),
     day: todayISO()
   });
-  saveDB(db);
+  
+  // FAST_OPS_V1: son seçim (dir/type/sub) hafızası
+  try{
+    if(!db.meta) db.meta={v:1};
+    if(!db.meta.lastChoice) db.meta.lastChoice={};
+    const dir = t.dir; // "+" / "-"
+    db.meta.lastChoice[dir] = { typeKey: t.k, sub: sub || "" };
+  }catch(e){}
+saveDB(db);
   closeModal();
   renderProducts();
 }
