@@ -107,6 +107,7 @@
 
 
 /* V12_KOLI_MODE_MODAL_OPAQUE_V2 */
+/* V13_PRESETS_PACK_MEMORY */
 #modal{background:rgba(0,0,0,.78) !important;}
 .modalCard{
   background: var(--card) !important;
@@ -237,7 +238,11 @@
       <div class="hint">Hızlı koli sayısı</div>
       <div class="miniRow" id="quickPackRow"></div>
 
-      <div class="modeHint">Toplam adet: <b id="opPackTotal">0</b> (koli×iç adet)</div>
+      
+      <div class="hint">Hızlı koli içi adet</div>
+      <div class="miniRow" id="quickPackSizeRow"></div>
+
+<div class="modeHint">Toplam adet: <b id="opPackTotal">0</b> (koli×iç adet)</div>
       <div class="modeHint">Not: Koli içi adet girersen sistem bunu bu ürüne hatırlar.</div>
     </div>
 
@@ -334,6 +339,115 @@ const TYPE_DEF = [
   ]},
 ];
 
+/* V13_PRESETS_PACK_MEMORY */
+const PRESET_QTY   = [1,2,3,4,5,10,12,15,20];
+const PRESET_PACKN = [1,2,3,4,5];
+const PRESET_PACKS = [6,10,12,15,20];
+
+function uniqNums(arr){
+  const seen=new Set();
+  const out=[];
+  for(const x of (arr||[])){
+    const n = parseInt(String(x||"").trim(),10);
+    if(!n || n<=0) continue;
+    if(seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  return out;
+}
+
+function getPackFavs(pid){
+  if(!pid) return [];
+  const db=loadDB();
+  const prod=db.products.find(x=>x.id===pid);
+  if(!prod) return [];
+  return Array.isArray(prod.packFavs) ? prod.packFavs : [];
+}
+
+function learnPackFavToProduct(packSize){
+  const n = parseInt(String(packSize||"").trim(),10) || 0;
+  if(n<=0) return;
+
+  const db=loadDB();
+  const pid=$("opProd")?.value;
+  if(!pid) return;
+  const prod=db.products.find(x=>x.id===pid);
+  if(!prod) return;
+
+  if(!Array.isArray(prod.packFavs)) prod.packFavs=[];
+  prod.packFavs = uniqNums([n] + prod.packFavs).slice(0,6); // max 6 favori
+  saveDB(db);
+}
+
+function buildQuickQtyRow(){
+  const wrap=$("quickQtyRow");
+  if(!wrap) return;
+  wrap.innerHTML="";
+  for(const n of PRESET_QTY){
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="btn smallBtn";
+    b.textContent=String(n);
+    b.addEventListener("click", ()=>{
+      $("opQty").value=String(n);
+      try{$("opQty").focus({preventScroll:true});}catch(e){}
+    });
+    wrap.appendChild(b);
+  }
+}
+
+function buildQuickPackNRow(){
+  const wrap=$("quickPackRow");
+  if(!wrap) return;
+  wrap.innerHTML="";
+  for(const n of PRESET_PACKN){
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="btn smallBtn";
+    b.textContent=String(n)+" koli";
+    b.addEventListener("click", ()=>{
+      $("opPackCount").value=String(n);
+      updatePackTotal();
+      try{$("opPackCount").focus({preventScroll:true});}catch(e){}
+    });
+    wrap.appendChild(b);
+  }
+}
+
+function buildQuickPackSizeRow(){
+  const wrap=$("quickPackSizeRow");
+  if(!wrap) return;
+  wrap.innerHTML="";
+
+  const pid=$("opProd")?.value;
+  const favs=getPackFavs(pid);
+  const merged=uniqNums([...(favs||[]), ...PRESET_PACKS]);
+
+  for(const n of merged){
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="btn smallBtn";
+    b.textContent=String(n)+" iç";
+    b.title="Koli içi adet: "+n;
+    b.addEventListener("click", ()=>{
+      $("opPackSize").value=String(n);
+      updatePackTotal();
+      learnPackDefaultToProduct(n);
+      learnPackFavToProduct(n);
+      try{$("opPackSize").focus({preventScroll:true});}catch(e){}
+    });
+    wrap.appendChild(b);
+  }
+}
+
+function buildV13Presets(){
+  buildQuickQtyRow();
+  buildQuickPackNRow();
+  buildQuickPackSizeRow();
+}
+
+
 /* V12_KOLI_MODE_MODAL_OPAQUE_V2 */
 let OP_MODE = "adet"; // "adet" | "koli"
 
@@ -349,6 +463,7 @@ function setMode(mode){
     bK.classList.remove("modeBtnOn");
     wA.style.display="";
     wK.style.display="none";
+    buildV13Presets();
     setTimeout(()=>{ try{$("opQty").focus({preventScroll:true});}catch(e){} }, 60);
   }else{
     bK.classList.add("modeBtnOn");
@@ -356,7 +471,7 @@ function setMode(mode){
     wK.style.display="";
     wA.style.display="none";
     syncPackDefaultsFromProduct();
-    buildQuickPackRow();
+    buildV13Presets();
     updatePackTotal();
     setTimeout(()=>{ try{$("opPackCount").focus({preventScroll:true});}catch(e){} }, 60);
   }
@@ -1024,6 +1139,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
     updatePackTotal();
   });
 
+  // v1.3 presets
+  try{ buildV13Presets(); }catch(e){}
   // açılışta adet modu
   try{ setMode("adet"); }catch(e){}
 });
