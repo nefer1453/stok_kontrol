@@ -5,121 +5,594 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stok Kontrol Motoru</title>
   <meta name="theme-color" content="#0b1220">
-  <link rel="stylesheet" href="./app/app.css">
+  <style>
+    :root{
+      --bg:#070b14; --card:#0b1220; --card2:#0d1730;
+      --text:#e5e7eb; --muted:#94a3b8; --line:rgba(255,255,255,.08);
+      --ok:#16a34a; --bad:#ef4444; --warn:#f59e0b; --blue:#2563eb;
+      --r:20px; --pad:14px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#070b14,#05070f);color:var(--text)}
+    header{position:sticky;top:0;z-index:50;background:rgba(7,11,20,.72);backdrop-filter: blur(10px);border-bottom:1px solid var(--line)}
+    .wrap{max-width:920px;margin:0 auto;padding:14px 14px 18px}
+    .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    h1{font-size:20px;margin:0}
+    .sub{color:var(--muted);font-size:12px;margin-top:4px}
+    .chip{display:inline-flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.03);color:var(--muted);font-size:12px}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px}
+    @media(min-width:900px){.grid{grid-template-columns:1.15fr .85fr}}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid var(--line);border-radius:var(--r);padding:var(--pad);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .card h2{margin:0 0 8px;font-size:15px}
+    .hint{color:var(--muted);font-size:12px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column;gap:10px}
+    input,select,textarea{
+      width:100%; background:rgba(255,255,255,.03); color:var(--text);
+      border:1px solid var(--line); border-radius:16px; padding:12px 12px;
+      outline:none; font-size:14px;
+    }
+    input::placeholder,textarea::placeholder{color:rgba(148,163,184,.7)}
+    .btn{
+      border:0; border-radius:16px; padding:12px 14px; font-weight:900;
+      background:rgba(255,255,255,.06); color:var(--text); cursor:pointer;
+      border:1px solid rgba(255,255,255,.08);
+      user-select:none;
+    }
+    .btnOK{background:rgba(22,163,74,.18); border-color:rgba(22,163,74,.35)}
+    .btnBAD{background:rgba(239,68,68,.16); border-color:rgba(239,68,68,.35)}
+    .btnBLUE{background:rgba(37,99,235,.16); border-color:rgba(37,99,235,.35)}
+    .btn:active{transform:translateY(1px)}
+    .hr{height:1px;background:var(--line);margin:12px 0}
+    .pill{display:inline-flex;gap:6px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.03);font-size:12px}
+    .kpi{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px}
+    .kpi .pill{justify-content:center;font-weight:900}
+    .list{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+    .item{padding:12px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.03)}
+    .itemTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .name{font-weight:950}
+    .muted{color:var(--muted);font-size:12px;margin-top:4px}
+    .miniRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .tag{font-size:12px;padding:7px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--muted)}
+    .netBig{font-size:26px;font-weight:1000;letter-spacing:.3px}
+    .netBox{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .smallBtn{padding:10px 12px;border-radius:14px}
+    .danger{color:#fecaca}
+    /* REPORT_COMPACT_V2 */
+    #cardReport{max-height: calc(100vh - 150px); overflow:auto; -webkit-overflow-scrolling: touch;}
+    #cardReport .row:first-of-type{position: sticky; top:0; z-index:5; background: var(--card, #fff); padding-top:10px; padding-bottom:10px;}
+    #cardReport .hr{margin:10px 0}
+    /* ERROR_GUARD */
+    #errorGuardBox{position:fixed;left:0;right:0;bottom:0;background:#7f1d1d;color:#fff;padding:12px;font-size:12px;display:none;z-index:99999;max-height:40vh;overflow:auto;border-top:2px solid #ef4444}
+  </style>
 </head>
 <body>
-
 <header>
   <div class="wrap">
     <div class="top">
       <div>
         <h1>Stok Kontrol Motoru</h1>
-        <div class="sub">Clean v2 — ürün + işlem + rapor (stabil temel)</div>
+        <div class="sub">v1 — ürün + işlemler + rapor + “akıl” çekirdeği</div>
       </div>
-      <div class="row">
-        <span class="pill">Local DB: stok_kontrol_db_v2</span>
-      </div>
+      <div class="chip" id="chipMeta">Local • Hazır</div>
     </div>
   </div>
 </header>
 
 <main class="wrap">
   <div class="grid">
-    <!-- SOL: Ürünler -->
+    <!-- SOL -->
     <section class="card">
-      <h2>Ürünler</h2>
-      <div class="hint">Ürün ekle → ürün kartından “İşlem” aç.</div>
+      <h2>Ürün</h2>
+      <div class="hint">Ürün ekle / ara / stok kartları</div>
+      <div class="row" style="margin-top:10px">
+        <input id="inProd" placeholder="Ürün adı (Enter = ekle)" />
+        <button class="btn btnOK" id="btnAddProd" type="button">Ekle</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input id="inSearch" placeholder="Ara (sabit)" />
+        <button class="btn smallBtn" id="btnClearSearch" type="button">Temizle</button>
+      </div>
+
       <div class="hr"></div>
 
-      <div class="row">
-        <input id="prodName" placeholder="Ürün adı" inputmode="text" autocomplete="off">
-        <button id="btnAdd" class="btnOK" type="button">Ekle</button>
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="pill">Toplam: <b id="pCount">0</b></div>
+        <button class="btn btnBLUE" id="btnAddOp" type="button">İşlem Ekle</button>
       </div>
 
-      <div class="row">
-        <input id="search" placeholder="Ara (liste sabit kalsın)" inputmode="text" autocomplete="off">
-      </div>
-
-      <div id="productList" class="list"></div>
-
-      <div class="footerNote">Not: Donma/boş ekran olursa alttaki kırmızı hata bandı mesaj verir.</div>
+      <div class="list" id="prodList"></div>
     </section>
 
-    <!-- SAĞ: Rapor -->
+    <!-- SAĞ: RAPOR -->
     <section class="card" id="cardReport">
-      <div class="row" style="justify-content:space-between">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
         <div>
           <h2 style="margin-bottom:2px">Rapor</h2>
-          <div class="hint">Özet (bugün / 7 gün / 30 gün)</div>
+          <div class="hint">Özet ve “akıl” (bugün / 7 gün / 30 gün)</div>
         </div>
         <div class="row">
-          <button id="btnReportToday" class="btnBLUE smallBtn" type="button">Bugün</button>
-          <button id="btnReport7" class="btnBLUE smallBtn" type="button">7g</button>
-          <button id="btnReport30" class="btnBLUE smallBtn" type="button">30g</button>
+          <button id="btnReportToday" class="btn btnBLUE" type="button">Bugün</button>
+          <button id="btnReport7" class="btn btnBLUE" type="button">7g</button>
+          <button id="btnReport30" class="btn btnBLUE" type="button">30g</button>
         </div>
       </div>
 
-      <div class="hr"></div>
-
-      <div class="kpiRow">
-        <div class="kpi"><div class="k">Pencere</div><div class="v"><span id="rDays">30</span>g</div></div>
-        <div class="kpi"><div class="k">Artış</div><div class="v" id="rPlus">0</div></div>
-        <div class="kpi"><div class="k">Azalış</div><div class="v" id="rMinus">0</div></div>
-        <div class="kpi"><div class="k">Net</div><div class="v" id="rNet">0</div></div>
+      <div class="kpi">
+        <div class="pill">Artı: <b id="rPlus">0</b></div>
+        <div class="pill">Eksi: <b id="rMinus">0</b></div>
+        <div class="pill">Net: <b id="rNet">0</b></div>
       </div>
 
       <div class="hr"></div>
-
-      <div class="hint" style="margin-bottom:6px">Tür dağılımı</div>
-      <div id="rTypes" class="row"></div>
-
-      <div class="hr"></div>
-
-      <div class="hint" style="margin-bottom:6px">Top ürünler</div>
-      <div id="rTop" class="row"></div>
+      <div class="hint">En çok ürünler</div>
+      <div class="list" id="rTop"></div>
 
       <div class="hr"></div>
+      <div class="hint">Tür dağılımı</div>
+      <div class="list" id="rTypes"></div>
 
-      <div class="hint" style="margin-bottom:6px">Akıl / risk</div>
-      <div id="rBrain" class="list"></div>
+      <div class="hr"></div>
+      <div class="hint">Akıl</div>
+      <div class="list" id="rBrain"></div>
+
+      <div class="hr"></div>
+      <button class="btn" id="btnSkorTest" type="button">Skor Test (debug)</button>
+      <div class="hint" style="margin-top:8px">Sadece test: ilk ürüne göre skor/çıktı verir.</div>
     </section>
   </div>
 </main>
 
-<!-- Modal -->
-<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;padding:16px">
-  <div class="card" style="max-width:560px;margin:40px auto">
-    <div class="row" style="justify-content:space-between">
+<!-- MODAL -->
+<div id="modal" style="position:fixed;inset:0;display:none;z-index:9999;background:rgba(0,0,0,.6);padding:14px">
+  <div class="card" style="max-width:720px;margin:0 auto;max-height:85vh;overflow:auto">
+    <div class="row" style="justify-content:space-between;align-items:center">
       <div>
-        <div class="hint">İşlem</div>
-        <div class="name" id="opTitle">Ürün</div>
+        <div class="name">İşlem Ekle</div>
+        <div class="hint">Ürün seç → tür seç → alt kırılım (varsa) → adet</div>
       </div>
-      <button id="btnClose" type="button">Kapat</button>
+      <button class="btn" id="btnClose" type="button">Kapat</button>
     </div>
 
     <div class="hr"></div>
 
     <div class="row">
-      <select id="opType">
-        <option value="siparis">Sipariş (+)</option>
-        <option value="dagilim">Dağılım (+)</option>
-        <option value="satis">Satış (-)</option>
-        <option value="skt">SKT (-)</option>
-        <option value="iade">İade (-)</option>
-      </select>
-      <input id="opQty" inputmode="numeric" placeholder="Adet" value="1">
+      <select id="opProd"></select>
+      <input id="opQty" inputmode="numeric" placeholder="Adet (örn 3)" />
     </div>
 
     <div class="row">
-      <input id="opSub" placeholder="Alt kırılım (opsiyonel): normal/iskonto/insert, sebep vb." autocomplete="off">
+      <select id="opType"></select>
+      <select id="opSub"></select>
+    </div>
+
+    <div class="row">
+      <input id="opNote" placeholder="Not (opsiyonel)" />
     </div>
 
     <div class="row" style="justify-content:flex-end">
-      <button id="btnOpSave" class="btnOK" type="button">İşlem Ekle</button>
+      <button class="btn btnOK" id="btnSaveOp" type="button">Kaydet</button>
     </div>
+
+    <div class="hr"></div>
+    <div class="hint">Hızlı seçim (tek dokunuş)</div>
+    <div class="miniRow" id="quickRow"></div>
   </div>
 </div>
 
-<script defer src="./app/app.js"></script>
+<div id="errorGuardBox"><b>Sistem Hatası:</b><br><div id="errorGuardText"></div></div>
+
+<script>
+/* ====== CORE DB ====== */
+const KEY="stok_kontrol_db_v1";
+const $=id=>document.getElementById(id);
+
+function loadDB(){
+  let db=null;
+  try{ db=JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
+  if(!db || typeof db!=="object") db={products:[], ops:[], meta:{v:1}};
+  if(!Array.isArray(db.products)) db.products=[];
+  if(!Array.isArray(db.ops)) db.ops=[];
+  if(!db.meta) db.meta={v:1};
+  return db;
+}
+function saveDB(db){ localStorage.setItem(KEY, JSON.stringify(db)); }
+function uid(){ return Date.now().toString(16)+Math.random().toString(16).slice(2); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+/* ====== TYPES (Senin mantığın) ====== */
+/*
+Artma tetikleri:
+- Sipariş (Firma/Depo altı)  -> + (opsiyonel detay)
+- Dağılım (Normal/İskonto/Insert + kaynak) -> +
+Eksilme tetikleri:
+- Satış -> -
+- SKT -> -
+- İade (Müşteri/Tarihi geçmiş/Fabrika/Raf) -> -
+*/
+const TYPE_DEF = [
+  {k:"siparis",  label:"Sipariş (+)", dir:"+", subs:[
+    "Firma • Ziyaret aldı",
+    "Firma • Telefon geldi",
+    "Firma • Telefon ettik",
+    "Depo • Merkez depoya",
+    "Depo • Şarküteri depoya"
+  ]},
+  {k:"dagilim",  label:"Dağılım (+)", dir:"+", subs:[
+    "Merkez • Normal",
+    "Merkez • İskonto",
+    "Merkez • Insert",
+    "Insert • (isim/tarih not'a)"
+  ]},
+  {k:"satis",    label:"Satış (-)",   dir:"-", subs:[
+    "Normal satış",
+    "Insert satış",
+    "İskonto satış"
+  ]},
+  {k:"skt",      label:"SKT (-)",     dir:"-", subs:[
+    "Tarihi yaklaşan kontrol",
+    "Tarihi geçmiş ayrıldı"
+  ]},
+  {k:"iade",     label:"İade (-)",    dir:"-", subs:[
+    "Müşteri iadesi",
+    "Tarihi geçmiş",
+    "Fabrika kaynaklı",
+    "Raf kaynaklı"
+  ]},
+];
+
+function computeStock(db, pid){
+  let net=0;
+  for(const o of db.ops){
+    if(o.pid!==pid) continue;
+    const qty = Number(o.qty||0);
+    if(!qty) continue;
+    net += (o.dir==="+" ? qty : -qty);
+  }
+  return net;
+}
+
+/* ====== RENDER PRODUCTS ====== */
+function renderProducts(){
+  const db=loadDB();
+  const q=($("inSearch").value||"").trim().toLowerCase();
+  const list=$("prodList");
+  list.innerHTML="";
+  $("pCount").textContent=String(db.products.length);
+
+  const filtered = db.products.filter(p=>!q || (p.name||"").toLowerCase().includes(q));
+
+  if(!filtered.length){
+    list.innerHTML = `<div class="item"><div class="hint">Ürün yok / arama sonucu boş.</div></div>`;
+    fillProdSelect(); // modal select güncel kalsın
+    renderReport("today");
+    return;
+  }
+
+  for(const p of filtered){
+    const net = computeStock(db, p.id);
+    const el=document.createElement("div");
+    el.className="item";
+    el.innerHTML=`
+      <div class="itemTop">
+        <div style="flex:1">
+          <div class="name">${escapeHTML(p.name||"")}</div>
+          <div class="muted">ID: ${p.id.slice(0,8)} • Son: ${new Date(p.ts||Date.now()).toLocaleString("tr-TR")}</div>
+        </div>
+        <div class="netBox">
+          <div class="netBig" title="Net Stok">${net}</div>
+        </div>
+      </div>
+      <div class="miniRow">
+        <span class="tag">Net: <b>${net}</b></span>
+        <button class="btn smallBtn btnOK" data-act="plus" data-pid="${p.id}" type="button">+ İşlem</button>
+        <button class="btn smallBtn btnBAD" data-act="minus" data-pid="${p.id}" type="button">- İşlem</button>
+        <button class="btn smallBtn" data-act="hist" data-pid="${p.id}" type="button">Geçmiş</button>
+      </div>
+      <div class="list" id="hist_${p.id}" style="display:none;margin-top:10px"></div>
+    `;
+    list.appendChild(el);
+  }
+
+  // ürün kart aksiyonları
+  list.querySelectorAll("button[data-act]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const act=btn.getAttribute("data-act");
+      const pid=btn.getAttribute("data-pid");
+      if(act==="hist"){ toggleHistory(pid); return; }
+      openModal(pid, act==="plus" ? "+" : "-");
+    });
+  });
+
+  fillProdSelect();
+  renderReport("today");
+}
+
+function escapeHTML(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ====== HISTORY (Ürün bazlı detay) ====== */
+function toggleHistory(pid){
+  const db=loadDB();
+  const box=$("hist_"+pid);
+  if(!box) return;
+  const visible = box.style.display!=="none";
+  if(visible){ box.style.display="none"; return; }
+  box.style.display="block";
+
+  const ops = db.ops.filter(o=>o.pid===pid).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60);
+  if(!ops.length){
+    box.innerHTML = `<div class="item"><div class="hint">Bu üründe işlem yok.</div></div>`;
+    return;
+  }
+  box.innerHTML = ops.map(o=>{
+    const dt=new Date(o.ts||Date.now()).toLocaleString("tr-TR");
+    const sign = o.dir==="+" ? "+" : "-";
+    return `
+      <div class="item" style="background:rgba(255,255,255,.02)">
+        <div class="row" style="justify-content:space-between">
+          <div class="name">${sign}${o.qty} • ${escapeHTML(o.typeLabel||o.type||"")}</div>
+          <div class="tag">${escapeHTML(dt)}</div>
+        </div>
+        <div class="muted">${escapeHTML(o.sub||"")} ${o.note?(" • "+escapeHTML(o.note)):""}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+/* ====== MODAL ====== */
+function fillProdSelect(){
+  const db=loadDB();
+  const sel=$("opProd");
+  if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML="";
+  for(const p of db.products){
+    const net=computeStock(db,p.id);
+    const opt=document.createElement("option");
+    opt.value=p.id;
+    opt.textContent=`${p.name}  (net:${net})`;
+    sel.appendChild(opt);
+  }
+  if(cur && [...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
+
+function fillTypeSelect(dirHint){
+  const tSel=$("opType");
+  tSel.innerHTML="";
+  for(const t of TYPE_DEF){
+    // dirHint varsa filtrele (kart üzerindeki + / -)
+    if(dirHint && t.dir!==dirHint) continue;
+    const opt=document.createElement("option");
+    opt.value=t.k;
+    opt.textContent=t.label;
+    tSel.appendChild(opt);
+  }
+  // default ilk
+  tSel.selectedIndex=0;
+  fillSubSelect();
+  buildQuickRow();
+}
+
+function fillSubSelect(){
+  const tSel=$("opType");
+  const sSel=$("opSub");
+  const t=TYPE_DEF.find(x=>x.k===tSel.value);
+  sSel.innerHTML="";
+  // opsiyonel: boş seçenek (hız için)
+  const none=document.createElement("option");
+  none.value="";
+  none.textContent="Alt kırılım (opsiyonel)";
+  sSel.appendChild(none);
+
+  if(t && Array.isArray(t.subs)){
+    for(const sub of t.subs){
+      const opt=document.createElement("option");
+      opt.value=sub;
+      opt.textContent=sub;
+      sSel.appendChild(opt);
+    }
+  }
+  sSel.selectedIndex=0;
+}
+
+function buildQuickRow(){
+  const wrap=$("quickRow");
+  wrap.innerHTML="";
+  const tSel=$("opType");
+  const t=TYPE_DEF.find(x=>x.k===tSel.value);
+  if(!t) return;
+
+  // hızlı alt kırılım chip'leri (tek dokunuş)
+  const arr=(t.subs||[]).slice(0,6);
+  for(const sub of arr){
+    const b=document.createElement("button");
+    b.className="btn smallBtn";
+    b.type="button";
+    b.textContent=sub.split("•")[0].trim();
+    b.title=sub;
+    b.addEventListener("click", ()=>{
+      $("opSub").value=sub;
+    });
+    wrap.appendChild(b);
+  }
+}
+
+function openModal(pid, dirHint){
+  $("modal").style.display="block";
+  fillProdSelect();
+  if(pid) $("opProd").value=pid;
+  fillTypeSelect(dirHint);
+
+  $("opQty").value="";
+  $("opNote").value="";
+  // flicker öldürmek için agresif autofocus yok:
+  setTimeout(()=>{ try{$("opQty").focus({preventScroll:true});}catch(e){} }, 60);
+}
+
+function closeModal(){
+  $("modal").style.display="none";
+}
+
+function addProduct(){
+  const name=($("inProd").value||"").trim();
+  if(!name){ alert("Ürün adı yaz."); return; }
+  const db=loadDB();
+  db.products.push({id:uid(), name, ts:Date.now()});
+  saveDB(db);
+  $("inProd").value="";
+  renderProducts();
+  try{$("inProd").focus({preventScroll:true});}catch(e){}
+}
+
+function addOp(){
+  const pid=$("opProd").value;
+  const qty=Math.abs(parseInt(($("opQty").value||"").trim(),10))||0;
+  if(!pid){ alert("Ürün seç."); return; }
+  if(!qty){ alert("Adet gir (örn 3)."); $("opQty").focus(); return; }
+
+  const tKey=$("opType").value;
+  const t=TYPE_DEF.find(x=>x.k===tKey);
+  if(!t){ alert("Tür seç."); return; }
+
+  const db=loadDB();
+  const sub=($("opSub").value||"").trim();
+  const note=($("opNote").value||"").trim();
+
+  db.ops.push({
+    id:uid(),
+    pid,
+    dir:t.dir,
+    type:t.k,
+    typeLabel:t.label,
+    sub:sub,
+    note:note,
+    qty:qty,
+    ts:Date.now(),
+    day: todayISO()
+  });
+  saveDB(db);
+  closeModal();
+  renderProducts();
+}
+
+/* ====== REPORT / ANALYTICS ====== */
+function opsInDays(db, days){
+  const now = new Date();
+  const from = new Date(now.getTime() - days*24*3600*1000);
+  return db.ops.filter(o=>{
+    const d = new Date(o.ts||0);
+    return d>=from;
+  });
+}
+function reportForDays(days){
+  const db=loadDB();
+  const ops=opsInDays(db, days);
+  let plus=0, minus=0;
+  for(const o of ops){
+    const q=Number(o.qty||0);
+    if(o.dir==="+") plus+=q; else minus+=q;
+  }
+  $("rPlus").textContent=String(plus);
+  $("rMinus").textContent=String(minus);
+  $("rNet").textContent=String(plus - minus);
+
+  // Top ürünler
+  const m=new Map();
+  for(const o of ops){
+    const p=db.products.find(x=>x.id===o.pid);
+    if(!p) continue;
+    const key=p.id;
+    const cur=m.get(key)||{name:p.name, score:0, plus:0, minus:0};
+    if(o.dir==="+"){cur.plus+=Number(o.qty||0)}else{cur.minus+=Number(o.qty||0)}
+    cur.score += Number(o.qty||0);
+    m.set(key,cur);
+  }
+  const top=[...m.values()].sort((a,b)=>(b.plus+b.minus)-(a.plus+a.minus)).slice(0,8);
+  $("rTop").innerHTML = top.length ? top.map(x=>`
+    <div class="item">
+      <div class="row" style="justify-content:space-between">
+        <div class="name">${escapeHTML(x.name)}</div>
+        <div class="tag">net ${x.plus-x.minus}</div>
+      </div>
+      <div class="muted">+${x.plus} / -${x.minus}</div>
+    </div>
+  `).join("") : `<div class="item"><div class="hint">Bu aralıkta veri yok.</div></div>`;
+
+  // Tür dağılımı
+  const tm=new Map();
+  for(const o of ops){
+    const k=o.typeLabel||o.type||"";
+    tm.set(k, (tm.get(k)||0) + Number(o.qty||0));
+  }
+  const trows=[...tm.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);
+  $("rTypes").innerHTML = trows.length ? trows.map(([k,v])=>`
+    <div class="item">
+      <div class="row" style="justify-content:space-between">
+        <div class="name">${escapeHTML(k)}</div>
+        <div class="tag">${v}</div>
+      </div>
+    </div>
+  `).join("") : `<div class="item"><div class="hint">Tür verisi yok.</div></div>`;
+
+  // “Akıl” (basit, donmayan)
+  const brain=[];
+  if(ops.length===0) brain.push("Veri yok: önce işlem gir.");
+  if(minus>plus) brain.push("🟥 Eksilme artıdan fazla: satış/skt/iade baskın.");
+  if(plus>0 && minus===0) brain.push("🟧 Sadece artış var: dağılım/sipariş girilmiş, satış yok.");
+  if(plus-minus<0) brain.push("🟥 Net negatif: stok açığı/yanlış kayıt ihtimali.");
+  if(brain.length===0) brain.push("🟩 Stabil: kritik sinyal yok.");
+  $("rBrain").innerHTML = brain.map(t=>`<div class="item"><div class="name">${escapeHTML(t)}</div></div>`).join("");
+}
+
+function reportToday(){ reportForDays(1); }
+
+/* ====== ERROR GUARD ====== */
+(function(){
+  function showError(msg){
+    const box=$("errorGuardBox");
+    const txt=$("errorGuardText");
+    if(!box||!txt) return;
+    box.style.display="block";
+    txt.textContent=msg;
+  }
+  window.addEventListener("error", e=> showError((e.message||"Hata") + " @ " + (e.filename||"") + ":" + (e.lineno||"")));
+  window.addEventListener("unhandledrejection", e=> showError("Promise Error: " + (e.reason?.message || e.reason)));
+})();
+
+/* ====== EVENTS ====== */
+$("btnAddProd").onclick=addProduct;
+$("inProd").addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); addProduct(); }});
+$("btnAddOp").onclick=()=>openModal(null,null);
+$("btnClose").onclick=closeModal;
+$("modal").addEventListener("click",(e)=>{ if(e.target.id==="modal") closeModal(); });
+
+$("opType").addEventListener("change", ()=>{ fillSubSelect(); buildQuickRow(); });
+$("btnSaveOp").onclick=addOp;
+
+$("btnClearSearch").onclick=()=>{ $("inSearch").value=""; renderProducts(); };
+$("inSearch").addEventListener("input", ()=>renderProducts());
+
+$("btnReportToday").onclick=()=>reportToday();
+$("btnReport7").onclick=()=>reportForDays(7);
+$("btnReport30").onclick=()=>reportForDays(30);
+
+// Skor test (debug): kritik değilse “0” gibi davranır → burada basit çıktı gösteriyoruz
+$("btnSkorTest").onclick=()=>{
+  const db=loadDB();
+  if(!db.products.length){ alert("Önce ürün ekle."); return; }
+  const pid=db.products[0].id;
+  const net=computeStock(db,pid);
+  alert("Skor Test ✅\n\nİlk ürün: "+db.products[0].name+"\nNet: "+net+"\n\nNot: Skor sistemi kritik sinyal yoksa 'stabil' sayar.");
+};
+
+(function boot(){
+  $("chipMeta").textContent = "LocalStorage • " + KEY;
+  renderProducts();
+  reportToday();
+  // agresif autofocus yok: flicker riskini azaltır
+})();
+</script>
 </body>
 </html>
