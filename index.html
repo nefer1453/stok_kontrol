@@ -1226,3 +1226,44 @@ setTimeout(renderRiskPanel,700);
 
 </body>
 </html>
+
+<script>
+/* ERROR_GUARD_V1 */
+(function(){
+  if(document.getElementById("errorGuardBox")) return;
+
+  const box = document.createElement("div");
+  box.id = "errorGuardBox";
+  box.style.position = "fixed";
+  box.style.left = "0";
+  box.style.right = "0";
+  box.style.bottom = "0";
+  box.style.background = "#7f1d1d";
+  box.style.color = "#fff";
+  box.style.padding = "12px";
+  box.style.fontSize = "12px";
+  box.style.display = "none";
+  box.style.zIndex = "99999";
+  box.style.maxHeight = "40vh";
+  box.style.overflow = "auto";
+  box.style.borderTop = "2px solid #ef4444";
+  box.innerHTML = "<b>Sistem Hatası:</b><br><div id='errorGuardText'></div>";
+
+  document.body.appendChild(box);
+
+  function showError(msg){
+    box.style.display = "block";
+    document.getElementById("errorGuardText").textContent = msg;
+  }
+
+  window.addEventListener("error", function(e){
+    showError(e.message + " @ " + (e.filename||"") + ":" + (e.lineno||""));
+  });
+
+  window.addEventListener("unhandledrejection", function(e){
+    showError("Promise Error: " + (e.reason?.message || e.reason));
+  });
+
+})();
+</script>
+
