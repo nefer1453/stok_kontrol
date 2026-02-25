@@ -1,3 +1,77 @@
+
+/* SUBTYPES_V1 */
+const OP_SUBTYPES = {
+  // Artma
+  "siparis": [
+    "firma_ziyaret",          // firma yetkilisi mağazaya geldi
+    "firma_telefon_geldi",    // firma yetkilisi aradı
+    "firma_telefon_edildi",   // biz aradık
+    "depo_merkez",            // merkez depoya
+    "depo_sarkuteri"          // şarküteri depoya
+  ],
+  "dagilim": [
+    "merkez_dagilim",
+    "iskonto_dagilim",
+    "insert_dagilim"
+  ],
+
+  // Eksilme
+  "satis": [
+    "normal_satis",
+    "insert_satis",
+    "iskonto_satis"
+  ],
+  "skt": [
+    "skt_cikti"
+  ],
+  "iade": [
+    "musteri_iadesi",
+    "tarihi_gecmis",
+    "fabrika_sorun",
+    "raf_sorun"
+  ]
+};
+
+const OP_SUBTYPE_LABEL = {
+  "firma_ziyaret":"Firma ziyareti",
+  "firma_telefon_geldi":"Firma telefon geldi",
+  "firma_telefon_edildi":"Firma telefon edildi",
+  "depo_merkez":"Depoya sipariş (Merkez)",
+  "depo_sarkuteri":"Depoya sipariş (Şarküteri)",
+
+  "merkez_dagilim":"Merkez dağılımı",
+  "iskonto_dagilim":"İskonto dağılımı",
+  "insert_dagilim":"İnsert dağılımı",
+
+  "normal_satis":"Normal satış",
+  "insert_satis":"İnsert satış",
+  "iskonto_satis":"İskonto satış",
+
+  "skt_cikti":"SKT çıktı",
+
+  "musteri_iadesi":"Müşteri iadesi",
+  "tarihi_gecmis":"Tarihi geçmiş",
+  "fabrika_sorun":"Fabrika sorunu",
+  "raf_sorun":"Raf sorunu"
+};
+
+// İnsert detayları sadece insert_* seçimlerinde açılacak
+function isInsertSubtype(sub){ return String(sub||"").indexOf("insert_") === 0; }
+
+// Zorunluluk kontrolü: type seçildi mi + subtype seçildi mi
+function requireSubtypeOrThrow(type, subtype){
+  const t = String(type||"").trim();
+  const sub = String(subtype||"").trim();
+  if(!t) throw new Error("İşlem türü seçilmedi.");
+  const list = OP_SUBTYPES[t];
+  if(list && list.length){
+    if(!sub) throw new Error("Alt kırılım seçilmedi.");
+    if(!list.includes(sub)) throw new Error("Alt kırılım geçersiz: "+sub);
+  }
+  return true;
+}
+
+
 /* Stok Kontrol Motoru — Clean v2 (tek dosya, stabil) */
 (() => {
   "use strict";
