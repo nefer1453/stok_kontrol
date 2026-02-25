@@ -26,11 +26,13 @@
     .card h2{margin:0 0 8px;font-size:15px}
     .hint{color:var(--muted);font-size:12px}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column;gap:10px}
     input,select,textarea{
       width:100%; background:rgba(255,255,255,.03); color:var(--text);
       border:1px solid var(--line); border-radius:16px; padding:12px 12px;
       outline:none; font-size:14px;
     }
+    input::placeholder,textarea::placeholder{color:rgba(148,163,184,.7)}
     .btn{
       border:0; border-radius:16px; padding:12px 14px; font-weight:900;
       background:rgba(255,255,255,.06); color:var(--text); cursor:pointer;
@@ -40,11 +42,42 @@
     .btnOK{background:rgba(22,163,74,.18); border-color:rgba(22,163,74,.35)}
     .btnBAD{background:rgba(239,68,68,.16); border-color:rgba(239,68,68,.35)}
     .btnBLUE{background:rgba(37,99,235,.16); border-color:rgba(37,99,235,.35)}
+    .btn:active{transform:translateY(1px)}
     .hr{height:1px;background:var(--line);margin:12px 0}
+    .pill{display:inline-flex;gap:6px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.03);font-size:12px}
+    .kpi{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px}
+    .kpi .pill{justify-content:center;font-weight:900}
     .list{display:flex;flex-direction:column;gap:10px;margin-top:10px}
     .item{padding:12px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.03)}
-    /* modal opak */
-    #modal{position:fixed;inset:0;display:none;z-index:9999;background:rgba(0,0,0,.78);padding:14px}
+    .itemTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .name{font-weight:950}
+    .muted{color:var(--muted);font-size:12px;margin-top:4px}
+    .miniRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .tag{font-size:12px;padding:7px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--muted)}
+    .netBig{font-size:26px;font-weight:1000;letter-spacing:.3px}
+    .netBox{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .smallBtn{padding:10px 12px;border-radius:14px}
+
+    /* REPORT_COMPACT (sağ kart içinde scroll + sticky üst bar) */
+    #cardReport{max-height: calc(100vh - 150px); overflow:auto; -webkit-overflow-scrolling: touch;}
+    #cardReport .row:first-of-type{position: sticky; top:0; z-index:5; background: var(--card, #fff); padding-top:10px; padding-bottom:10px;}
+    #cardReport .hr{margin:10px 0}
+
+    /* MODAL: opak */
+    #modal{background:rgba(0,0,0,.78) !important;}
+    .modalCard{
+      background: var(--card) !important;
+      border: 1px solid var(--line) !important;
+      box-shadow: 0 18px 50px rgba(0,0,0,.55) !important;
+    }
+
+    /* Adet/Koli mod */
+    .modeBtn{padding:10px 12px;border-radius:999px}
+    .modeBtnOn{background:rgba(37,99,235,.22);border-color:rgba(37,99,235,.45)}
+    .modeHint{color:var(--muted);font-size:12px;margin-top:6px}
+
+    /* Error Guard */
+    #errorGuardBox{position:fixed;left:0;right:0;bottom:0;background:#7f1d1d;color:#fff;padding:12px;font-size:12px;display:none;z-index:99999;max-height:40vh;overflow:auto;border-top:2px solid #ef4444}
   </style>
 </head>
 <body>
@@ -53,7 +86,7 @@
     <div class="top">
       <div>
         <h1>Stok Kontrol Motoru</h1>
-        <div class="sub">Build sistemi aktif — artık patch yok ✅</div>
+        <div class="sub">v1.4 — adet/koli + rapor + akıl (stabil)</div>
       </div>
       <div class="chip" id="chipMeta">Local • Hazır</div>
     </div>
@@ -62,87 +95,273 @@
 
 <main class="wrap">
   <div class="grid">
+    <!-- SOL -->
     <section class="card">
       <h2>Ürün</h2>
+      <div class="hint">Ürün ekle / ara / stok kartları</div>
       <div class="row" style="margin-top:10px">
-        <input id="inProd" placeholder="Ürün adı (Enter=ekle)" />
+        <input id="inProd" placeholder="Ürün adı (Enter = ekle)" />
         <button class="btn btnOK" id="btnAddProd" type="button">Ekle</button>
       </div>
-
       <div class="row" style="margin-top:10px">
         <input id="inSearch" placeholder="Ara (sabit)" />
-        <button class="btn" id="btnClearSearch" type="button">Temizle</button>
+        <button class="btn smallBtn" id="btnClearSearch" type="button">Temizle</button>
       </div>
 
       <div class="hr"></div>
-      <div class="row" style="justify-content:space-between">
-        <div class="hint">Toplam: <b id="pCount">0</b></div>
+
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="pill">Toplam: <b id="pCount">0</b></div>
         <button class="btn btnBLUE" id="btnAddOp" type="button">İşlem Ekle</button>
       </div>
 
       <div class="list" id="prodList"></div>
     </section>
 
+    <!-- SAĞ: RAPOR -->
     <section class="card" id="cardReport">
-      <h2>Rapor</h2>
-      <div class="hint">Şimdilik iskelet (bir sonraki adımda dolduracağız)</div>
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div>
+          <h2 style="margin-bottom:2px">Rapor</h2>
+          <div class="hint">Özet ve “akıl” (bugün / 7 gün / 30 gün)</div>
+        </div>
+        <div class="row">
+          <button id="btnReportToday" class="btn btnBLUE" type="button">Bugün</button>
+          <button id="btnReport7" class="btn btnBLUE" type="button">7g</button>
+          <button id="btnReport30" class="btn btnBLUE" type="button">30g</button>
+        </div>
+      </div>
+
+      <div class="kpi">
+        <div class="pill">Artı: <b id="rPlus">0</b></div>
+        <div class="pill">Eksi: <b id="rMinus">0</b></div>
+        <div class="pill">Net: <b id="rNet">0</b></div>
+      </div>
+
       <div class="hr"></div>
-      <div class="item">Durum: Stabil</div>
+      <div class="hint">En çok ürünler</div>
+      <div class="list" id="rTop"></div>
+
+      <div class="hr"></div>
+      <div class="hint">Tür dağılımı</div>
+      <div class="list" id="rTypes"></div>
+
+      <div class="hr"></div>
+      <div class="hint">Akıl</div>
+      <div class="list" id="rBrain"></div>
     </section>
   </div>
 </main>
 
-<div id="modal">
-  <div class="card" style="max-width:720px;margin:0 auto;max-height:85vh;overflow:auto;background:var(--card)">
-    <div class="row" style="justify-content:space-between">
-      <b>İşlem Ekle</b>
+<!-- MODAL -->
+<div id="modal" style="position:fixed;inset:0;display:none;z-index:9999;padding:14px">
+  <div class="card modalCard" style="max-width:720px;margin:0 auto;max-height:85vh;overflow:auto">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div>
+        <div class="name">İşlem Ekle</div>
+        <div class="hint">Ürün seç → tür → alt kırılım → adet/koli</div>
+      </div>
       <button class="btn" id="btnClose" type="button">Kapat</button>
     </div>
+
     <div class="hr"></div>
 
     <div class="row">
       <select id="opProd"></select>
-      <button class="btn btnBLUE" id="btnModeAdet" type="button">Adet</button>
-      <button class="btn" id="btnModeKoli" type="button">Koli</button>
+      <div class="row" style="gap:8px">
+        <button class="btn modeBtn modeBtnOn" id="btnModeAdet" type="button">Adet</button>
+        <button class="btn modeBtn" id="btnModeKoli" type="button">Koli</button>
+      </div>
+    </div>
+
+    <!-- ADET MODU -->
+    <div id="wrapAdet">
+      <div class="row" style="margin-top:10px">
+        <input id="opQty" inputmode="numeric" placeholder="Adet (örn 3)" />
+      </div>
+      <div class="hint">Hızlı adet</div>
+      <div class="miniRow" id="quickQtyRow"></div>
+    </div>
+
+    <!-- KOLİ MODU -->
+    <div id="wrapKoli" style="display:none">
+      <div class="row" style="margin-top:10px">
+        <input id="opPackCount" inputmode="numeric" placeholder="Koli sayısı (örn 2)" />
+        <input id="opPackSize" inputmode="numeric" placeholder="Koli içi adet (örn 12)" />
+      </div>
+
+      <div class="hint">Koli içi preset (ürüne özel)</div>
+      <div class="miniRow" id="quickPackSizeRow"></div>
+
+      <div class="hint" style="margin-top:8px">Hızlı koli sayısı</div>
+      <div class="miniRow" id="quickPackRow"></div>
+
+      <div class="modeHint">Toplam adet: <b id="opPackTotal">0</b> (koli×iç adet)</div>
+      <div class="modeHint">Not: Koli içi adet girersen sistem bunu bu ürüne hatırlar.</div>
     </div>
 
     <div class="row" style="margin-top:10px">
-      <input id="opQty" inputmode="numeric" placeholder="Adet (örn 3)" />
+      <select id="opType"></select>
+      <select id="opSub"></select>
     </div>
 
-    <div class="row" style="margin-top:10px;justify-content:flex-end">
+    <div class="row">
+      <input id="opNote" placeholder="Not (opsiyonel)" />
+    </div>
+
+    <div class="row" style="justify-content:flex-end">
       <button class="btn btnOK" id="btnSaveOp" type="button">Kaydet</button>
     </div>
+
+    <div class="hr"></div>
+    <div class="hint">Hızlı alt kırılım</div>
+    <div class="miniRow" id="quickRow"></div>
   </div>
 </div>
 
+<div id="errorGuardBox"><b>Sistem Hatası:</b><br><div id="errorGuardText"></div></div>
+
 <script>
-const KEY="stok_kontrol_db_build_v1";
+/* ====== CORE DB ====== */
+const KEY="stok_kontrol_db_v1";
 const $=id=>document.getElementById(id);
 
 function loadDB(){
   let db=null;
   try{ db=JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
-  if(!db || typeof db!=="object") db={products:[], ops:[]};
+  if(!db || typeof db!=="object") db={products:[], ops:[], meta:{v:1}};
   if(!Array.isArray(db.products)) db.products=[];
   if(!Array.isArray(db.ops)) db.ops=[];
+  if(!db.meta) db.meta={v:1};
   return db;
 }
 function saveDB(db){ localStorage.setItem(KEY, JSON.stringify(db)); }
 function uid(){ return Date.now().toString(16)+Math.random().toString(16).slice(2); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function escapeHTML(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-function fillProdSelect(){
-  const db=loadDB();
-  const sel=$("opProd");
-  sel.innerHTML="";
-  for(const p of db.products){
-    const opt=document.createElement("option");
-    opt.value=p.id;
-    opt.textContent=p.name;
-    sel.appendChild(opt);
+/* ====== TYPES (senin mantığın) ====== */
+const TYPE_DEF = [
+  {k:"siparis",  label:"Sipariş (+)", dir:"+", subs:[
+    "Firma • Ziyaret aldı","Firma • Telefon geldi","Firma • Telefon ettik",
+    "Depo • Merkez depoya","Depo • Şarküteri depoya"
+  ]},
+  {k:"dagilim",  label:"Dağılım (+)", dir:"+", subs:[
+    "Merkez • Normal","Merkez • İskonto","Merkez • Insert","Insert • (isim/tarih not'a)"
+  ]},
+  {k:"satis",    label:"Satış (-)",   dir:"-", subs:["Normal satış","Insert satış","İskonto satış"]},
+  {k:"skt",      label:"SKT (-)",     dir:"-", subs:["Tarihi yaklaşan kontrol","Tarihi geçmiş ayrıldı"]},
+  {k:"iade",     label:"İade (-)",    dir:"-", subs:["Müşteri iadesi","Tarihi geçmiş","Fabrika kaynaklı","Raf kaynaklı"]},
+];
+
+function computeStock(db, pid){
+  let net=0;
+  for(const o of db.ops){
+    if(o.pid!==pid) continue;
+    const qty = Number(o.qty||0);
+    if(!qty) continue;
+    net += (o.dir==="+" ? qty : -qty);
+  }
+  return net;
+}
+
+/* ====== MODE (Adet/Koli) ====== */
+let OP_MODE="adet"; // adet | koli
+
+function getProdById(db,pid){ return db.products.find(x=>x.id===pid)||null; }
+
+function setMode(mode){
+  OP_MODE=mode;
+  const bA=$("btnModeAdet"), bK=$("btnModeKoli");
+  const wA=$("wrapAdet"), wK=$("wrapKoli");
+  if(!bA||!bK||!wA||!wK) return;
+
+  if(mode==="adet"){
+    bA.classList.add("modeBtnOn"); bK.classList.remove("modeBtnOn");
+    wA.style.display=""; wK.style.display="none";
+    setTimeout(()=>{ try{$("opQty").focus({preventScroll:true});}catch(e){} }, 60);
+  }else{
+    bK.classList.add("modeBtnOn"); bA.classList.remove("modeBtnOn");
+    wK.style.display=""; wA.style.display="none";
+    syncPackDefaultsFromProduct();
+    buildQuickPackRow();
+    buildQuickPackSizeRow();
+    updatePackTotal();
+    setTimeout(()=>{ try{$("opPackCount").focus({preventScroll:true});}catch(e){} }, 60);
   }
 }
 
+function updatePackTotal(){
+  const c=parseInt(($("opPackCount")?.value||"0").trim(),10)||0;
+  const s=parseInt(($("opPackSize")?.value||"0").trim(),10)||0;
+  const tot=Math.max(0,c)*Math.max(0,s);
+  if($("opPackTotal")) $("opPackTotal").textContent=String(tot);
+}
+
+function buildQuickPackRow(){
+  const wrap=$("quickPackRow"); if(!wrap) return;
+  wrap.innerHTML="";
+  const presets=[1,2,3,4,5];
+  for(const n of presets){
+    const b=document.createElement("button");
+    b.type="button"; b.className="btn smallBtn";
+    b.textContent=`${n} koli`;
+    b.onclick=()=>{ $("opPackCount").value=String(n); updatePackTotal(); };
+    wrap.appendChild(b);
+  }
+}
+
+function syncPackDefaultsFromProduct(){
+  const db=loadDB();
+  const pid=$("opProd")?.value; if(!pid) return;
+  const prod=getProdById(db,pid); if(!prod) return;
+
+  // packDefault varsa ve input boşsa doldur
+  if(prod.packDefault && !String($("opPackSize")?.value||"").trim()){
+    $("opPackSize").value=String(prod.packDefault);
+  }
+}
+
+function learnPackToProduct(packSize){
+  const n=parseInt(String(packSize||"").trim(),10)||0;
+  if(n<=0) return;
+
+  const db=loadDB();
+  const pid=$("opProd")?.value; if(!pid) return;
+  const prod=getProdById(db,pid); if(!prod) return;
+
+  prod.packDefault = n;
+
+  // packSizes listesi (ürüne özel)
+  if(!Array.isArray(prod.packSizes)) prod.packSizes=[];
+  if(!prod.packSizes.includes(n)) prod.packSizes.push(n);
+  prod.packSizes = prod.packSizes.filter(x=>Number.isFinite(x)).sort((a,b)=>a-b);
+
+  saveDB(db);
+}
+
+function buildQuickPackSizeRow(){
+  const wrap=$("quickPackSizeRow"); if(!wrap) return;
+  wrap.innerHTML="";
+  const db=loadDB();
+  const pid=$("opProd")?.value;
+  const prod = pid ? getProdById(db,pid) : null;
+
+  // önce ürünün bildiği packSizes, yoksa genel preset
+  const fallback=[5,6,10,12,15,20];
+  const arr = (prod && Array.isArray(prod.packSizes) && prod.packSizes.length) ? prod.packSizes : fallback;
+
+  for(const n of arr.slice(0,10)){
+    const b=document.createElement("button");
+    b.type="button"; b.className="btn smallBtn";
+    b.textContent=`${n}'li`;
+    b.title=`Koli içi ${n} adet`;
+    b.onclick=()=>{ $("opPackSize").value=String(n); updatePackTotal(); };
+    wrap.appendChild(b);
+  }
+}
+
+/* ====== UI: PRODUCTS ====== */
 function renderProducts(){
   const db=loadDB();
   const q=($("inSearch").value||"").trim().toLowerCase();
@@ -150,57 +369,316 @@ function renderProducts(){
   list.innerHTML="";
   $("pCount").textContent=String(db.products.length);
 
-  const arr=db.products.filter(p=>!q || (p.name||"").toLowerCase().includes(q));
-  if(!arr.length){
-    list.innerHTML=`<div class="item"><div class="hint">Ürün yok / arama boş.</div></div>`;
+  const filtered=db.products.filter(p=>!q || (p.name||"").toLowerCase().includes(q));
+  if(!filtered.length){
+    list.innerHTML=`<div class="item"><div class="hint">Ürün yok / arama sonucu boş.</div></div>`;
     fillProdSelect();
+    reportToday();
     return;
   }
-  for(const p of arr){
+
+  for(const p of filtered){
+    const net=computeStock(db,p.id);
+    const packInfo = p.packDefault ? `<span class="tag">koli içi: <b>${p.packDefault}</b></span>` : "";
     const el=document.createElement("div");
     el.className="item";
-    el.innerHTML=`<b>${p.name}</b><div class="hint">ID: ${p.id.slice(0,8)}</div>`;
+    el.innerHTML=`
+      <div class="itemTop">
+        <div style="flex:1">
+          <div class="name">${escapeHTML(p.name||"")}</div>
+          <div class="muted">ID: ${p.id.slice(0,8)} • ${new Date(p.ts||Date.now()).toLocaleString("tr-TR")}</div>
+        </div>
+        <div class="netBox"><div class="netBig" title="Net Stok">${net}</div></div>
+      </div>
+      <div class="miniRow">
+        <span class="tag">Net: <b>${net}</b></span>
+        ${packInfo}
+        <button class="btn smallBtn btnOK" data-act="plus" data-pid="${p.id}" type="button">+ İşlem</button>
+        <button class="btn smallBtn btnBAD" data-act="minus" data-pid="${p.id}" type="button">- İşlem</button>
+        <button class="btn smallBtn" data-act="hist" data-pid="${p.id}" type="button">Geçmiş</button>
+      </div>
+      <div class="list" id="hist_${p.id}" style="display:none;margin-top:10px"></div>
+    `;
     list.appendChild(el);
   }
+
+  list.querySelectorAll("button[data-act]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const act=btn.getAttribute("data-act");
+      const pid=btn.getAttribute("data-pid");
+      if(act==="hist"){ toggleHistory(pid); return; }
+      openModal(pid, act==="plus" ? "+" : "-");
+    });
+  });
+
   fillProdSelect();
+  reportToday();
 }
+
+/* ====== HISTORY ====== */
+function toggleHistory(pid){
+  const db=loadDB();
+  const box=$("hist_"+pid);
+  if(!box) return;
+  const visible = box.style.display!=="none";
+  if(visible){ box.style.display="none"; return; }
+  box.style.display="block";
+
+  const ops=db.ops.filter(o=>o.pid===pid).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,60);
+  if(!ops.length){
+    box.innerHTML=`<div class="item"><div class="hint">Bu üründe işlem yok.</div></div>`;
+    return;
+  }
+  box.innerHTML=ops.map(o=>{
+    const dt=new Date(o.ts||Date.now()).toLocaleString("tr-TR");
+    const sign=o.dir==="+"?"+":"-";
+    const unit = (o.unitMode==="koli" && o.packCount && o.packSize) ? ` • ${o.packCount} koli × ${o.packSize}` : "";
+    return `
+      <div class="item" style="background:rgba(255,255,255,.02)">
+        <div class="row" style="justify-content:space-between">
+          <div class="name">${sign}${o.qty} • ${escapeHTML(o.typeLabel||o.type||"")}${unit}</div>
+          <div class="tag">${escapeHTML(dt)}</div>
+        </div>
+        <div class="muted">${escapeHTML(o.sub||"")} ${o.note?(" • "+escapeHTML(o.note)):""}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+/* ====== MODAL ====== */
+function fillProdSelect(){
+  const db=loadDB();
+  const sel=$("opProd"); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML="";
+  for(const p of db.products){
+    const net=computeStock(db,p.id);
+    const opt=document.createElement("option");
+    opt.value=p.id;
+    opt.textContent=`${p.name}  (net:${net})`;
+    sel.appendChild(opt);
+  }
+  if(cur && [...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
+
+function fillTypeSelect(dirHint){
+  const tSel=$("opType");
+  tSel.innerHTML="";
+  for(const t of TYPE_DEF){
+    if(dirHint && t.dir!==dirHint) continue;
+    const opt=document.createElement("option");
+    opt.value=t.k; opt.textContent=t.label;
+    tSel.appendChild(opt);
+  }
+  tSel.selectedIndex=0;
+  fillSubSelect();
+  buildQuickRow();
+}
+
+function fillSubSelect(){
+  const tSel=$("opType");
+  const sSel=$("opSub");
+  const t=TYPE_DEF.find(x=>x.k===tSel.value);
+  sSel.innerHTML="";
+  const none=document.createElement("option");
+  none.value=""; none.textContent="Alt kırılım (opsiyonel)";
+  sSel.appendChild(none);
+  if(t && Array.isArray(t.subs)){
+    for(const sub of t.subs){
+      const opt=document.createElement("option");
+      opt.value=sub; opt.textContent=sub;
+      sSel.appendChild(opt);
+    }
+  }
+  sSel.selectedIndex=0;
+}
+
+function buildQuickRow(){
+  const wrap=$("quickRow"); if(!wrap) return;
+  wrap.innerHTML="";
+  const t=TYPE_DEF.find(x=>x.k===$("opType").value);
+  if(!t) return;
+  const arr=(t.subs||[]).slice(0,6);
+  for(const sub of arr){
+    const b=document.createElement("button");
+    b.className="btn smallBtn"; b.type="button";
+    b.textContent=sub.split("•")[0].trim();
+    b.title=sub;
+    b.onclick=()=>{ $("opSub").value=sub; };
+    wrap.appendChild(b);
+  }
+}
+
+function openModal(pid, dirHint){
+  $("modal").style.display="block";
+  fillProdSelect();
+  if(pid) $("opProd").value=pid;
+  fillTypeSelect(dirHint);
+
+  $("opQty").value="";
+  $("opPackCount").value="";
+  $("opPackSize").value="";
+  $("opNote").value="";
+  setMode("adet");
+}
+
+function closeModal(){ $("modal").style.display="none"; }
 
 function addProduct(){
   const name=($("inProd").value||"").trim();
   if(!name){ alert("Ürün adı yaz."); return; }
   const db=loadDB();
-  db.products.push({id:uid(), name, ts:Date.now()});
+  db.products.push({id:uid(), name, ts:Date.now(), packDefault:0, packSizes:[]});
   saveDB(db);
   $("inProd").value="";
   renderProducts();
+  try{$("inProd").focus({preventScroll:true});}catch(e){}
 }
-
-function openModal(){
-  $("modal").style.display="block";
-  fillProdSelect();
-}
-function closeModal(){ $("modal").style.display="none"; }
 
 function addOp(){
   const pid=$("opProd").value;
-  const qty=Math.abs(parseInt(($("opQty").value||"").trim(),10))||0;
   if(!pid){ alert("Ürün seç."); return; }
-  if(!qty){ alert("Adet gir."); $("opQty").focus(); return; }
+
+  let qty=0, packCount=0, packSize=0;
+
+  if(OP_MODE==="adet"){
+    qty = Math.abs(parseInt(($("opQty").value||"").trim(),10))||0;
+    if(!qty){ alert("Adet gir (örn 3)."); $("opQty").focus(); return; }
+  }else{
+    packCount = Math.abs(parseInt(($("opPackCount").value||"").trim(),10))||0;
+    packSize  = Math.abs(parseInt(($("opPackSize").value||"").trim(),10))||0;
+    qty = packCount * packSize;
+    if(!qty){
+      alert("Koli sayısı ve koli içi adet gir (örn 2 koli × 12).");
+      try{$("opPackCount").focus();}catch(e){}
+      return;
+    }
+    learnPackToProduct(packSize);
+  }
+
+  const tKey=$("opType").value;
+  const t=TYPE_DEF.find(x=>x.k===tKey);
+  if(!t){ alert("Tür seç."); return; }
+
   const db=loadDB();
-  db.ops.push({id:uid(), pid, qty, ts:Date.now()});
+  const sub=($("opSub").value||"").trim();
+  const note=($("opNote").value||"").trim();
+
+  db.ops.push({
+    id:uid(), pid,
+    dir:t.dir, type:t.k, typeLabel:t.label,
+    sub, note,
+    qty,
+    unitMode: OP_MODE,
+    packCount, packSize,
+    ts:Date.now(),
+    day: todayISO()
+  });
   saveDB(db);
   closeModal();
-  alert("Kaydedildi ✅ (build iskelet)");
+  renderProducts();
 }
 
+/* ====== REPORT ====== */
+function opsInDays(db, days){
+  const now=new Date();
+  const from=new Date(now.getTime()-days*24*3600*1000);
+  return db.ops.filter(o=> new Date(o.ts||0) >= from);
+}
+function reportForDays(days){
+  const db=loadDB();
+  const ops=opsInDays(db, days);
+  let plus=0, minus=0;
+  for(const o of ops){
+    const q=Number(o.qty||0);
+    if(o.dir==="+") plus+=q; else minus+=q;
+  }
+  $("rPlus").textContent=String(plus);
+  $("rMinus").textContent=String(minus);
+  $("rNet").textContent=String(plus-minus);
+
+  const m=new Map();
+  for(const o of ops){
+    const p=db.products.find(x=>x.id===o.pid);
+    if(!p) continue;
+    const cur=m.get(p.id)||{name:p.name, plus:0, minus:0};
+    if(o.dir==="+") cur.plus+=Number(o.qty||0); else cur.minus+=Number(o.qty||0);
+    m.set(p.id,cur);
+  }
+  const top=[...m.values()].sort((a,b)=>(b.plus+b.minus)-(a.plus+a.minus)).slice(0,8);
+  $("rTop").innerHTML = top.length ? top.map(x=>`
+    <div class="item">
+      <div class="row" style="justify-content:space-between">
+        <div class="name">${escapeHTML(x.name)}</div>
+        <div class="tag">net ${x.plus-x.minus}</div>
+      </div>
+      <div class="muted">+${x.plus} / -${x.minus}</div>
+    </div>
+  `).join("") : `<div class="item"><div class="hint">Bu aralıkta veri yok.</div></div>`;
+
+  const tm=new Map();
+  for(const o of ops){
+    const k=o.typeLabel||o.type||"";
+    tm.set(k, (tm.get(k)||0) + Number(o.qty||0));
+  }
+  const trows=[...tm.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);
+  $("rTypes").innerHTML = trows.length ? trows.map(([k,v])=>`
+    <div class="item"><div class="row" style="justify-content:space-between">
+      <div class="name">${escapeHTML(k)}</div><div class="tag">${v}</div>
+    </div></div>
+  `).join("") : `<div class="item"><div class="hint">Tür verisi yok.</div></div>`;
+
+  const brain=[];
+  if(ops.length===0) brain.push("Veri yok: önce işlem gir.");
+  if(minus>plus) brain.push("🟥 Eksilme artıdan fazla (satış/skt/iade baskın).");
+  if(plus>0 && minus===0) brain.push("🟧 Sadece artış var (dağılım/sipariş var, satış yok).");
+  if(plus-minus<0) brain.push("🟥 Net negatif: stok açığı/yanlış kayıt ihtimali.");
+  if(brain.length===0) brain.push("🟩 Stabil: kritik sinyal yok.");
+  $("rBrain").innerHTML = brain.map(t=>`<div class="item"><div class="name">${escapeHTML(t)}</div></div>`).join("");
+}
+function reportToday(){ reportForDays(1); }
+
+/* ====== ERROR GUARD ====== */
+(function(){
+  function showError(msg){
+    const box=$("errorGuardBox"), txt=$("errorGuardText");
+    if(!box||!txt) return;
+    box.style.display="block";
+    txt.textContent=msg;
+  }
+  window.addEventListener("error", e=> showError((e.message||"Hata")+" @ "+(e.filename||"")+":"+(e.lineno||"")));
+  window.addEventListener("unhandledrejection", e=> showError("Promise Error: "+(e.reason?.message||e.reason)));
+})();
+
+/* ====== HOOK ====== */
 document.addEventListener("DOMContentLoaded", ()=>{
   $("btnAddProd").onclick=addProduct;
-  $("inProd").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); addProduct(); }});
-  $("btnAddOp").onclick=openModal;
-  $("btnClose").onclick=closeModal;
-  $("btnSaveOp").onclick=addOp;
+  $("inProd").addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); addProduct(); }});
   $("btnClearSearch").onclick=()=>{ $("inSearch").value=""; renderProducts(); };
-  $("inSearch").addEventListener("input", renderProducts);
+  $("inSearch").addEventListener("input", ()=> renderProducts());
+
+  $("btnAddOp").onclick=()=> openModal("", "");
+  $("btnClose").onclick=closeModal;
+  $("modal").addEventListener("click", (e)=>{ if(e.target && e.target.id==="modal") closeModal(); });
+
+  $("btnModeAdet").onclick=()=> setMode("adet");
+  $("btnModeKoli").onclick=()=> setMode("koli");
+
+  $("opPackCount").addEventListener("input", updatePackTotal);
+  $("opPackSize").addEventListener("input", updatePackTotal);
+  $("opProd").addEventListener("change", ()=>{
+    if(OP_MODE==="koli"){ syncPackDefaultsFromProduct(); buildQuickPackSizeRow(); }
+    updatePackTotal();
+  });
+
+  $("opType").addEventListener("change", ()=>{ fillSubSelect(); buildQuickRow(); });
+
+  $("btnSaveOp").onclick=addOp;
+
+  $("btnReportToday").onclick=()=>reportToday();
+  $("btnReport7").onclick=()=>reportForDays(7);
+  $("btnReport30").onclick=()=>reportForDays(30);
+
   renderProducts();
 });
 </script>
