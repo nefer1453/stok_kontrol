@@ -6,3 +6,6 @@ patch_*.sh
 apply_*.sh
 install*.sh
 .trigger*
+add_subtypes_step2.sh
+fix_renderReport.sh
+step2_repo_clean.sh
