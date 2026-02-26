@@ -276,6 +276,7 @@
 /* MODAL_ONEHAND_V1 */
 /* QUICK_QTY_V1 */
 /* V12_KOLI_MODE_MODAL_OPAQUE_V2 */
+/* V14_FASTOPS_SOLID */
 /* ====== CORE DB ====== */
 const KEY="stok_kontrol_db_v1";
 const $=id=>document.getElementById(id);
@@ -333,6 +334,69 @@ const TYPE_DEF = [
     "Raf kaynaklı"
   ]},
 ];
+
+/* V14_FASTOPS_SOLID */
+function getProdById(db, pid){
+  return (db.products||[]).find(x=>x.id===pid) || null;
+}
+
+function pickTypeByDir(dir, preferredKey){
+  if(preferredKey){
+    const t0 = TYPE_DEF.find(t=>t.k===preferredKey && t.dir===dir);
+    if(t0) return t0;
+  }
+  return TYPE_DEF.find(t=>t.dir===dir) || null;
+}
+
+function rememberLastSelection(pid, dir, typeKey, sub){
+  const db=loadDB();
+  const prod=getProdById(db,pid);
+  if(!prod) return;
+
+  if(dir==="+"){
+    prod.lastPlusType = typeKey || prod.lastPlusType;
+    prod.lastPlusSub  = (sub!==undefined) ? sub : (prod.lastPlusSub||"");
+  }else{
+    prod.lastMinusType = typeKey || prod.lastMinusType;
+    prod.lastMinusSub  = (sub!==undefined) ? sub : (prod.lastMinusSub||"");
+  }
+  rememberLastSelection(pid, t.dir, t.k, sub);
+  saveDB(db);
+}
+
+function fastOp(pid, dir, unitMode, qty, packCount, packSize){
+  const db=loadDB();
+  const prod=getProdById(db,pid);
+  if(!prod) return;
+
+  const preferred = (dir==="+") ? prod.lastPlusType : prod.lastMinusType;
+  const t = pickTypeByDir(dir, preferred);
+  if(!t){ alert("Tür bulunamadı (TYPE_DEF)."); return; }
+
+  const sub = (dir==="+") ? (prod.lastPlusSub||"") : (prod.lastMinusSub||"");
+
+  db.ops.push({
+    id: uid(),
+    pid,
+    dir: t.dir,
+    type: t.k,
+    typeLabel: t.label,
+    sub: sub,
+    note: "",
+    qty: qty,
+    unitMode: unitMode,
+    packCount: packCount || 0,
+    packSize: packSize || 0,
+    ts: Date.now(),
+    day: todayISO()
+  });
+
+  rememberLastSelection(pid, dir, t.k, sub);
+
+  saveDB(db);
+  renderProducts();
+}
+
 
 /* V12_KOLI_MODE_MODAL_OPAQUE_V2 */
 let OP_MODE = "adet"; // "adet" | "koli"
@@ -464,7 +528,16 @@ function renderProducts(){
         <button class="btn smallBtn" data-act="qminus" data-pid="${p.id}" type="button">-1</button>
         <button class="btn smallBtn btnOK" data-act="plus" data-pid="${p.id}" type="button">+ İşlem</button>
         <button class="btn smallBtn btnBAD" data-act="minus" data-pid="${p.id}" type="button">- İşlem</button>
-        <button class="btn smallBtn" data-act="hist" data-pid="${p.id}" type="button">Geçmiş</button>
+        
+        <!-- V14 fast ops -->
+        <button class="btn smallBtn btnOK" data-act="aPlus1" data-pid="${p.id}" type="button">+1</button>
+        <button class="btn smallBtn btnBAD" data-act="aMinus1" data-pid="${p.id}" type="button">-1</button>
+        ${p.packDefault ? `
+          <button class="btn smallBtn btnOK" data-act="kPlus1" data-pid="${p.id}" type="button">+1 koli</button>
+          <button class="btn smallBtn btnBAD" data-act="kMinus1" data-pid="${p.id}" type="button">-1 koli</button>
+          <span class="tag">koli içi: <b>${p.packDefault}</b></span>
+        ` : ``}
+<button class="btn smallBtn" data-act="hist" data-pid="${p.id}" type="button">Geçmiş</button>
       </div>
       <div class="list" id="hist_${p.id}" style="display:none;margin-top:10px"></div>
     `;
@@ -479,7 +552,29 @@ function renderProducts(){
       if(act==="hist"){ toggleHistory(pid); return; }
       if(act==="qplus"){ quickOp(pid, "+", 1); return; }
       if(act==="qminus"){ quickOp(pid, "-", 1); return; }
-      openModal(pid, act==="plus" ? "+" : "-");
+      
+      // V14 fast ops
+      if(act==="aPlus1"){ fastOp(pid, "+", "adet", 1, 0, 0); return; }
+      if(act==="aMinus1"){ fastOp(pid, "-", "adet", 1, 0, 0); return; }
+
+      if(act==="kPlus1"){
+        const db=loadDB();
+        const prod=(db.products||[]).find(x=>x.id===pid);
+        const ps = prod && prod.packDefault ? Number(prod.packDefault) : 0;
+        if(!ps){ alert("Bu üründe koli içi adet yok. Koli modunda bir kez gir ki öğrensin."); return; }
+        fastOp(pid, "+", "koli", ps, 1, ps);
+        return;
+      }
+      if(act==="kMinus1"){
+        const db=loadDB();
+        const prod=(db.products||[]).find(x=>x.id===pid);
+        const ps = prod && prod.packDefault ? Number(prod.packDefault) : 0;
+        if(!ps){ alert("Bu üründe koli içi adet yok. Koli modunda bir kez gir ki öğrensin."); return; }
+        fastOp(pid, "-", "koli", ps, 1, ps);
+        return;
+      }
+
+openModal(pid, act==="plus" ? "+" : "-");
     });
   });
 
