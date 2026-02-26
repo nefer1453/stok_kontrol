@@ -308,6 +308,39 @@ reportForDays = function(days){
 .badge{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:12px;color:var(--muted)}
 .badge b{color:var(--text)}
 
+
+/* V18_SINGLE_EXPORT_ALERTS */
+
+/* Tek ekran modu: her şeyi alt alta dizer, rapor daha yönetici gibi tek sayfa */
+body.single .grid{grid-template-columns:1fr !important;}
+body.single #cardReport{max-height:none !important; overflow:visible !important;}
+body.single header{position:sticky; top:0;}
+
+/* Rapor içi export bar */
+.exportBar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:flex-end}
+.badge{display:inline-flex; align-items:center; gap:6px; padding:8px 10px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.03); font-size:12px; color:var(--muted)}
+.badge b{color:var(--text)}
+.miniTable .miniLine{padding:10px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.03);margin-top:8px}
+.miniTable .rRow{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.miniTable .rKey{font-weight:900}
+.miniTable .rTiny{color:var(--muted);font-size:12px;margin-top:6px}
+.alertRed{border-color:rgba(239,68,68,.45)!important;background:rgba(239,68,68,.10)!important}
+.alertAmber{border-color:rgba(245,158,11,.45)!important;background:rgba(245,158,11,.10)!important}
+.alertGreen{border-color:rgba(22,163,74,.45)!important;background:rgba(22,163,74,.10)!important}
+
+/* Print/PDF: yönetici çıktısı */
+@media print{
+  header{position:static !important; background:#fff !important; color:#000 !important; border:none !important}
+  body{background:#fff !important; color:#000 !important}
+  .card{box-shadow:none !important; background:#fff !important; border:1px solid #ddd !important}
+  .btn, .chip{display:none !important}
+  #modal, #errorGuardBox{display:none !important}
+  .wrap{max-width:100% !important; padding:0 !important}
+  .grid{grid-template-columns:1fr !important}
+  .hint{color:#333 !important}
+  .tag, .badge{border:1px solid #ddd !important; background:#fff !important; color:#111 !important}
+}
+
 </style>
 </head>
 <body>
@@ -319,6 +352,7 @@ reportForDays = function(days){
         <div class="sub">v1 — ürün + işlemler + rapor + “akıl” çekirdeği</div>
       </div>
       <div class="chip" id="chipMeta">Local • Hazır</div>
+      <button class="btn" id="btnSingle" type="button" style="padding:10px 12px;border-radius:999px">Tek Ekran</button>
     </div>
   </div>
 </header>
@@ -363,6 +397,11 @@ reportForDays = function(days){
         
           <button id="btnCSV" class="btn" type="button">CSV</button>
         </div>
+        <div class="exportBar">
+          <span class="badge">Aralık: <b id="rDaysLbl">1</b> gün</span>
+          <button class="btn" id="btnExportCSV" type="button">CSV Export</button>
+          <button class="btn" id="btnExportPDF" type="button">PDF (Yazdır)</button>
+        </div>
       </div>
 
       <div class="kpi">
@@ -391,6 +430,10 @@ reportForDays = function(days){
 <div class="hint">Stok Snapshot (Mevcut net stok)</div>
 <div class="miniTable" id="rStockNow"></div>
 
+
+      <div class="hr"></div>
+      <div class="hint">Kritik Alarm</div>
+      <div class="miniTable" id="rAlerts"></div>
 
       <div class="hr"></div>
       <div class="hint">Akıl</div>
@@ -501,6 +544,7 @@ reportForDays = function(days){
 /* V15_UNDO_DELETE_OPS */
 /* V16_REPORT_DETAIL_STOCK_CSV */
 /* V17_HQ_REPORTS */
+/* V18_SINGLE_EXPORT_ALERTS */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -1600,6 +1644,182 @@ if($("btnModeAdet")) $("btnModeAdet").onclick = ()=> setMode("adet");
 
   // açılışta adet modu
   try{ setMode("adet"); }catch(e){}
+});
+
+
+
+/* V18_SINGLE_EXPORT_ALERTS */
+let REPORT_DAYS = 1;
+
+function fmtInt(n){ try{return String(Math.trunc(Number(n)||0));}catch(e){return "0";} }
+
+function csvEsc(v){
+  const s = String(v==null? "" : v);
+  if(/[,"\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+
+function downloadText(filename, text){
+  const blob = new Blob([text], {type:"text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 800);
+}
+
+function exportCSV(){
+  const db = loadDB();
+  const ops = opsInDays(db, REPORT_DAYS);
+
+  const headerOps = ["ts","day","product","dir","type","sub","qty","unitMode","packCount","packSize","note"];
+  const rowsOps = [headerOps.join(",")];
+
+  for(const o of ops){
+    const prod = (db.products||[]).find(p=>p.id===o.pid);
+    const name = prod ? prod.name : ("#"+String(o.pid||"").slice(0,8));
+    const ts = new Date(o.ts||Date.now()).toISOString();
+    const day = o.day || ts.slice(0,10);
+    rowsOps.push([
+      csvEsc(ts),
+      csvEsc(day),
+      csvEsc(name),
+      csvEsc(o.dir||""),
+      csvEsc(o.typeLabel||o.type||""),
+      csvEsc(o.sub||""),
+      csvEsc(o.qty||0),
+      csvEsc(o.unitMode||""),
+      csvEsc(o.packCount||0),
+      csvEsc(o.packSize||0),
+      csvEsc(o.note||"")
+    ].join(","));
+  }
+
+  // stok snapshot
+  const headerP = ["product","net","packDefault"];
+  const rowsP = [headerP.join(",")];
+  for(const p of (db.products||[])){
+    const net = computeStock(db, p.id);
+    rowsP.push([csvEsc(p.name||""), csvEsc(net), csvEsc(p.packDefault||"")].join(","));
+  }
+
+  const stamp = new Date().toISOString().replace(/[:.]/g,"-");
+  downloadText("stok_kontrol_ops_"+REPORT_DAYS+"g_"+stamp+".csv", rowsOps.join("\n"));
+  downloadText("stok_kontrol_stok_"+stamp+".csv", rowsP.join("\n"));
+}
+
+function exportPDFPrint(){
+  // PDF için en stabil yol: tarayıcı yazdır (Firefox/Chrome -> PDF kaydet)
+  document.body.classList.add("single"); // çıktıda tek sayfa düzeni
+  setTimeout(()=>window.print(), 60);
+}
+
+function setSingleMode(on){
+  if(on) document.body.classList.add("single");
+  else document.body.classList.remove("single");
+  try{
+    localStorage.setItem("stok_kontrol_single_mode", on ? "1" : "0");
+  }catch(e){}
+}
+
+function initSingleMode(){
+  try{
+    const v = localStorage.getItem("stok_kontrol_single_mode");
+    setSingleMode(v==="1");
+  }catch(e){}
+}
+
+function computeAlerts(db, ops, days){
+  const alerts=[];
+
+  // 1) Net stok negatif olan ürünler (tümü)
+  for(const p of (db.products||[])){
+    const net = computeStock(db, p.id);
+    if(net < 0){
+      alerts.push({lvl:"red", text:`🟥 Stok açığı: ${p.name} (net ${net})`});
+    }
+  }
+
+  // 2) Insert dönüşüm düşük (seçili aralık)
+  const insD = ops.filter(o=>o.type==="dagilim" && String(o.sub||"").toLowerCase().includes("insert"));
+  const insS = ops.filter(o=>o.type==="satis"   && String(o.sub||"").toLowerCase().includes("insert"));
+  const dTot = insD.reduce((a,o)=>a+Number(o.qty||0),0);
+  const sTot = insS.reduce((a,o)=>a+Number(o.qty||0),0);
+  if(dTot>0){
+    const ratio = sTot/dTot;
+    if(ratio < 0.35) alerts.push({lvl:"red", text:`🟥 Insert zayıf: dönüşüm %${Math.round(ratio*100)} (dağılım ${dTot} / satış ${sTot})`});
+    else if(ratio < 0.60) alerts.push({lvl:"amber", text:`🟧 Insert orta: dönüşüm %${Math.round(ratio*100)} (dağılım ${dTot} / satış ${sTot})`});
+  }
+
+  // 3) İade yüksek (seçili aralık) — satışa oranla kaba sinyal
+  const ret = ops.filter(o=>o.type==="iade").reduce((a,o)=>a+Number(o.qty||0),0);
+  const sal = ops.filter(o=>o.type==="satis").reduce((a,o)=>a+Number(o.qty||0),0);
+  if(ret>0 && sal>0){
+    const r = ret/sal;
+    if(r >= 0.20) alerts.push({lvl:"red", text:`🟥 İade oranı yüksek: %${Math.round(r*100)} (iade ${ret} / satış ${sal})`});
+    else if(r >= 0.10) alerts.push({lvl:"amber", text:`🟧 İade dikkat: %${Math.round(r*100)} (iade ${ret} / satış ${sal})`});
+  }else if(ret>0 && sal==0){
+    alerts.push({lvl:"amber", text:`🟧 İade var ama satış yok (iade ${ret}). Kayıt/akış kontrol.`});
+  }
+
+  // 4) Sadece artış var (dağılım/sipariş) ama satış yok
+  const plus = ops.filter(o=>o.dir==="+").reduce((a,o)=>a+Number(o.qty||0),0);
+  const minus= ops.filter(o=>o.dir==="-").reduce((a,o)=>a+Number(o.qty||0),0);
+  if(plus>0 && minus==0) alerts.push({lvl:"amber", text:`🟧 Sadece artış var (sipariş/dağılım). Satış kaydı yok.`});
+
+  // 5) Her şey sakin
+  if(alerts.length==0) alerts.push({lvl:"green", text:"🟩 Kritik alarm yok (şimdilik)."});
+  return alerts.slice(0,10);
+}
+
+function renderAlerts(db, ops, days){
+  const box = $("rAlerts");
+  if(!box) return;
+  const arr = computeAlerts(db, ops, days);
+
+  box.innerHTML = arr.map(a=>{
+    const cls = a.lvl==="red" ? "alertRed" : (a.lvl==="amber" ? "alertAmber" : "alertGreen");
+    return `<div class="miniLine ${cls}"><div class="rRow"><div class="rKey">${escapeHTML(a.text)}</div></div></div>`;
+  }).join("");
+}
+
+// reportForDays hook: gün etiketi + alarm render
+const _reportForDays_V18 = reportForDays;
+reportForDays = function(days){
+  REPORT_DAYS = Number(days)||1;
+  _reportForDays_V18(days);
+
+  const lbl = $("rDaysLbl");
+  if(lbl) lbl.textContent = String(REPORT_DAYS);
+
+  const db = loadDB();
+  const ops = opsInDays(db, REPORT_DAYS);
+  renderAlerts(db, ops, REPORT_DAYS);
+};
+
+// UI bağlama
+document.addEventListener("DOMContentLoaded", ()=>{
+  initSingleMode();
+
+  const btn = $("btnSingle");
+  if(btn){
+    btn.addEventListener("click", ()=>{
+      const on = !document.body.classList.contains("single");
+      setSingleMode(on);
+      btn.textContent = on ? "Çift Kolon" : "Tek Ekran";
+    });
+    // ilk yazı
+    btn.textContent = document.body.classList.contains("single") ? "Çift Kolon" : "Tek Ekran";
+  }
+
+  if($("btnExportCSV")) $("btnExportCSV").addEventListener("click", exportCSV);
+  if($("btnExportPDF")) $("btnExportPDF").addEventListener("click", exportPDFPrint);
+
+  // sayfa açılır açılmaz: alarm + gün etiketi doğru olsun
+  try{ const db=loadDB(); const ops=opsInDays(db, REPORT_DAYS); renderAlerts(db, ops, REPORT_DAYS); }catch(e){}
 });
 
 </script>
