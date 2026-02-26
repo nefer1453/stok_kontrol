@@ -117,6 +117,19 @@
 .modeBtnOn{background:rgba(37,99,235,.22);border-color:rgba(37,99,235,.45)}
 .modeHint{color:var(--muted);font-size:12px;margin-top:6px}
 
+
+/* V15_UNDO_DELETE_OPS */
+.btnMini{
+  padding:8px 10px;
+  border-radius:12px;
+  font-size:12px;
+  font-weight:900;
+}
+.btnDel{
+  background:rgba(239,68,68,.14);
+  border-color:rgba(239,68,68,.35);
+}
+
 </style>
 </head>
 <body>
@@ -168,6 +181,7 @@
           <button id="btnReportToday" class="btn btnBLUE" type="button">Bugün</button>
           <button id="btnReport7" class="btn btnBLUE" type="button">7g</button>
           <button id="btnReport30" class="btn btnBLUE" type="button">30g</button>
+          <button id="btnUndo" class="btn" type="button">Geri Al</button>
         </div>
       </div>
 
@@ -277,7 +291,70 @@
 /* QUICK_QTY_V1 */
 /* V12_KOLI_MODE_MODAL_OPAQUE_V2 */
 /* V14_FASTOPS_SOLID */
+/* V15_UNDO_DELETE_OPS */
 /* ====== CORE DB ====== */
+// V15: Undo / Delete altyapısı
+function ensureMeta(db){
+  if(!db.meta || typeof db.meta!=="object") db.meta={};
+  if(!Array.isArray(db.meta.undoStack)) db.meta.undoStack=[];
+  return db;
+}
+
+function rememberUndo(db){
+  ensureMeta(db);
+  try{
+    const last = (db.ops && db.ops.length) ? db.ops[db.ops.length-1] : null;
+    if(last && last.id){
+      db.meta.undoStack.push(last.id);
+      // şişmesin
+      if(db.meta.undoStack.length>60) db.meta.undoStack = db.meta.undoStack.slice(-60);
+      db.meta.lastOpId = last.id;
+    }
+  }catch(e){}
+}
+
+function removeOpById(db, opId){
+  if(!opId) return False
+  let idx = -1
+  for(let i=0;i<(db.ops||[]).length;i++){
+    if(db.ops[i] && db.ops[i].id===opId){ idx=i; break; }
+  }
+  if(idx<0) return false;
+
+  db.ops.splice(idx,1);
+
+  // undoStack’ten de temizle (tüm kopyalar)
+  ensureMeta(db);
+  db.meta.undoStack = (db.meta.undoStack||[]).filter(x=>x!==opId);
+  if(db.meta.lastOpId===opId) db.meta.lastOpId = db.meta.undoStack.length ? db.meta.undoStack[db.meta.undoStack.length-1] : null;
+  return true;
+}
+
+function undoLast(){
+  const db=ensureMeta(loadDB());
+  const st=db.meta.undoStack||[];
+  if(!st.length){
+    alert("Geri alınacak işlem yok.");
+    return;
+  }
+  const opId = st.pop();
+  const ok = removeOpById(db, opId);
+  saveDB(db);
+  renderProducts();
+  if(!ok) alert("İşlem bulunamadı (zaten silinmiş olabilir).");
+}
+
+function deleteOp(opId, pid){
+  const db=ensureMeta(loadDB());
+  const ok = removeOpById(db, opId);
+  saveDB(db);
+  renderProducts();
+  // aynı ürünün geçmişini tekrar aç (tek dokunuşla geri dönsün)
+  try{ if(pid) toggleHistory(pid); }catch(e){}
+  if(!ok) alert("Silme başarısız (işlem bulunamadı).");
+}
+
+
 const KEY="stok_kontrol_db_v1";
 const $=id=>document.getElementById(id);
 
@@ -391,7 +468,9 @@ function fastOp(pid, dir, unitMode, qty, packCount, packSize){
     day: todayISO()
   });
 
-  rememberLastSelection(pid, dir, t.k, sub);
+  
+  rememberUndo(db);
+rememberLastSelection(pid, dir, t.k, sub);
 
   saveDB(db);
   renderProducts();
@@ -607,12 +686,27 @@ function toggleHistory(pid){
       <div class="item" style="background:rgba(255,255,255,.02)">
         <div class="row" style="justify-content:space-between">
           <div class="name">${sign}${o.qty} • ${escapeHTML(o.typeLabel||o.type||"")}</div>
-          <div class="tag">${escapeHTML(dt)}</div>
+          <div class="row" style="gap:8px;align-items:center">
+            <div class="tag">${escapeHTML(dt)}</div>
+            <button class="btn btnMini btnDel" type="button" data-del="${o.id}" data-pid="${o.pid}">Sil</button>
+          </div>
         </div>
         <div class="muted">${escapeHTML(o.sub||"")} ${o.note?(" • "+escapeHTML(o.note)):""}</div>
       </div>
     `;
   }).join("");
+
+    // V15: Sil butonları
+    box.querySelectorAll("button[data-del]").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        const opId = b.getAttribute("data-del");
+        const pid2 = b.getAttribute("data-pid");
+        if(!opId) return;
+        if(confirm("Bu işlemi silmek istiyor musun?")){
+          deleteOp(opId, pid2);
+        }
+      });
+    });
 }
 
 /* ====== MODAL ====== */
@@ -836,7 +930,9 @@ function quickOp(pid, dir, qty){
     ts:Date.now(),
     day: todayISO()
   });
-  saveDB(db);
+  
+  rememberUndo(db);
+saveDB(db);
   renderProducts();
   showToast((dir==="+"?"+":"-")+qty+" kaydedildi");
 }
@@ -970,7 +1066,9 @@ function addOp(){
     day: todayISO()
   });
   
-  // FAST_OPS_V1: son seçim (dir/type/sub) hafızası
+  
+  rememberUndo(db);
+// FAST_OPS_V1: son seçim (dir/type/sub) hafızası
   try{
     if(!db.meta) db.meta={v:1};
     if(!db.meta.lastChoice) db.meta.lastChoice={};
@@ -1108,7 +1206,8 @@ $("btnSkorTest").onclick=()=>{
 
 /* V12_BINDINGS */
 document.addEventListener("DOMContentLoaded", ()=>{
-  if($("btnModeAdet")) $("btnModeAdet").onclick = ()=> setMode("adet");
+    if($("btnUndo")) $("btnUndo").onclick = undoLast;
+if($("btnModeAdet")) $("btnModeAdet").onclick = ()=> setMode("adet");
   if($("btnModeKoli")) $("btnModeKoli").onclick = ()=> setMode("koli");
 
   if($("opPackCount")) $("opPackCount").addEventListener("input", updatePackTotal);
