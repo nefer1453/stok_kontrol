@@ -558,6 +558,7 @@ body.single header{position:sticky; top:0;}
 /* V17_HQ_REPORTS */
 /* V18_SINGLE_EXPORT_ALERTS */
 /* V19_MANAGER_REPORTS_SAFE */
+/* V20_FORECAST_ENGINE */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -1918,6 +1919,111 @@ reportForDays = function(days){
 
 document.addEventListener("DOMContentLoaded", ()=>{
   try{ renderManagerPanels(1); }catch(e){}
+});
+
+
+
+/* V20_FORECAST_ENGINE */
+
+function getLastNDaysOps(db, pid, n){
+  const now = new Date();
+  const arr=[];
+  for(let i=0;i<n;i++){
+    const d = new Date(now.getTime()-i*24*3600*1000);
+    const key = d.toISOString().slice(0,10);
+    const total = db.ops
+      .filter(o=>o.pid===pid && o.type==="satis")
+      .filter(o=>{
+        const day = o.day || new Date(o.ts||0).toISOString().slice(0,10);
+        return day===key;
+      })
+      .reduce((a,o)=>a+Number(o.qty||0),0);
+    arr.push(total);
+  }
+  return arr;
+}
+
+function computeForecast(){
+  const db = loadDB();
+  const result = [];
+
+  for(const p of (db.products||[])){
+
+    const net = computeStock(db, p.id);
+
+    const last7 = getLastNDaysOps(db, p.id, 7);
+    const avg7 = last7.reduce((a,b)=>a+b,0)/7;
+    const dailyAvg = avg7;
+
+    const daysLeft = dailyAvg>0 ? (net/dailyAvg) : 999;
+
+    const insertDist = db.ops.filter(o=>o.pid===p.id && o.type==="dagilim" && String(o.sub||"").toLowerCase().includes("insert"));
+    const insertSales = db.ops.filter(o=>o.pid===p.id && o.type==="satis" && String(o.sub||"").toLowerCase().includes("insert"));
+
+    const insD = insertDist.reduce((a,o)=>a+Number(o.qty||0),0);
+    const insS = insertSales.reduce((a,o)=>a+Number(o.qty||0),0);
+
+    const insertRatio = insD>0 ? (insS/insD) : 0;
+
+    const returns = db.ops.filter(o=>o.pid===p.id && o.type==="iade")
+      .reduce((a,o)=>a+Number(o.qty||0),0);
+
+    const totalSales = db.ops.filter(o=>o.pid===p.id && o.type==="satis")
+      .reduce((a,o)=>a+Number(o.qty||0),0);
+
+    const returnRate = totalSales>0 ? (returns/totalSales) : 0;
+
+    result.push({
+      name: p.name,
+      net,
+      avg7: Math.round(avg7),
+      daysLeft: Math.round(daysLeft),
+      insertRatio: Math.round(insertRatio*100),
+      returnRate: Math.round(returnRate*100)
+    });
+  }
+
+  renderForecast(result);
+}
+
+function renderForecast(rows){
+  let box = document.getElementById("rForecast");
+  if(!box){
+    const container = document.createElement("div");
+    container.innerHTML = `
+      <div class="hr"></div>
+      <div class="hint">Tahmin Motoru (Forecast + Risk)</div>
+      <div id="rForecast" class="card"></div>
+    `;
+    document.getElementById("cardReport").appendChild(container);
+    box = document.getElementById("rForecast");
+  }
+
+  if(rows.length===0){
+    box.innerHTML="<div class='hint'>Veri yok</div>";
+    return;
+  }
+
+  box.innerHTML = rows.map(r=>`
+    <div style="padding:10px;border-bottom:1px solid var(--line)">
+      <b>${r.name}</b><br>
+      Stok: ${r.net} |
+      7g Ort: ${r.avg7} |
+      Tahmini bitiş: ${r.daysLeft} gün |
+      Insert %: ${r.insertRatio} |
+      İade %: ${r.returnRate}
+    </div>
+  `).join("");
+}
+
+const _reportForDays_V20 = reportForDays;
+reportForDays = function(days){
+  _reportForDays_V20(days);
+  try{ computeForecast(); }catch(e){}
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  try{ computeForecast(); }catch(e){}
 });
 
 </script>
