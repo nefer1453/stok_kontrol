@@ -559,6 +559,7 @@ body.single header{position:sticky; top:0;}
 /* V18_SINGLE_EXPORT_ALERTS */
 /* V19_MANAGER_REPORTS_SAFE */
 /* V20_FORECAST_ENGINE */
+/* V21_RISK_ENGINE */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -2025,6 +2026,101 @@ reportForDays = function(days){
 document.addEventListener("DOMContentLoaded", ()=>{
   try{ computeForecast(); }catch(e){}
 });
+
+
+
+/* V21_RISK_ENGINE */
+
+function computeRiskScore(row){
+  let score = 0;
+
+  if(row.daysLeft <= 3) score += 40;
+  else if(row.daysLeft <= 7) score += 20;
+
+  if(row.insertRatio < 40) score += 20;
+
+  if(row.returnRate > 15) score += 20;
+
+  if(row.avg7 === 0 && row.net > 0) score += 10;
+
+  return score;
+}
+
+function renderRiskPanel(rows){
+
+  let box = document.getElementById("rRisk");
+  if(!box){
+    const container = document.createElement("div");
+    container.innerHTML = `
+      <div class="hr"></div>
+      <div class="hint">Risk Motoru</div>
+      <div id="rRisk" class="card"></div>
+    `;
+    document.getElementById("cardReport").appendChild(container);
+    box = document.getElementById("rRisk");
+  }
+
+  if(rows.length===0){
+    box.innerHTML = "<div class='hint'>Risk verisi yok</div>";
+    return;
+  }
+
+  box.innerHTML = rows.map(r=>{
+    const score = computeRiskScore(r);
+
+    let level = "🟢 Stabil";
+    if(score >= 60) level = "🔴 Kritik";
+    else if(score >= 30) level = "🟠 Dikkat";
+
+    return `
+      <div style="padding:10px;border-bottom:1px solid var(--line)">
+        <b>${r.name}</b><br>
+        Risk Skor: <b>${score}</b> — ${level}
+      </div>
+    `;
+  }).join("");
+}
+
+const _computeForecast_V21 = computeForecast;
+computeForecast = function(){
+  _computeForecast_V21();
+  try{
+    const db = loadDB();
+    const rows = [];
+    for(const p of (db.products||[])){
+      const net = computeStock(db, p.id);
+      const last7 = getLastNDaysOps(db, p.id, 7);
+      const avg7 = last7.reduce((a,b)=>a+b,0)/7;
+      const dailyAvg = avg7;
+      const daysLeft = dailyAvg>0 ? (net/dailyAvg) : 999;
+
+      const insertDist = db.ops.filter(o=>o.pid===p.id && o.type==="dagilim" && String(o.sub||"").toLowerCase().includes("insert"));
+      const insertSales = db.ops.filter(o=>o.pid===p.id && o.type==="satis" && String(o.sub||"").toLowerCase().includes("insert"));
+      const insD = insertDist.reduce((a,o)=>a+Number(o.qty||0),0);
+      const insS = insertSales.reduce((a,o)=>a+Number(o.qty||0),0);
+      const insertRatio = insD>0 ? (insS/insD)*100 : 0;
+
+      const returns = db.ops.filter(o=>o.pid===p.id && o.type==="iade")
+        .reduce((a,o)=>a+Number(o.qty||0),0);
+
+      const totalSales = db.ops.filter(o=>o.pid===p.id && o.type==="satis")
+        .reduce((a,o)=>a+Number(o.qty||0),0);
+
+      const returnRate = totalSales>0 ? (returns/totalSales)*100 : 0;
+
+      rows.push({
+        name: p.name,
+        net,
+        avg7: Math.round(avg7),
+        daysLeft: Math.round(daysLeft),
+        insertRatio: Math.round(insertRatio),
+        returnRate: Math.round(returnRate)
+      });
+    }
+
+    renderRiskPanel(rows);
+  }catch(e){}
+};
 
 </script>
 </body>
