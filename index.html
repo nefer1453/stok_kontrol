@@ -417,6 +417,18 @@ body.single header{position:sticky; top:0;}
       <div class="hr"></div>
       <div class="hint">Tür dağılımı</div>
       <div class="list" id="rTypes"></div>
+<div class="hr"></div>
+<div class="hint">Ürün Bazlı Satış (Merkez ekranı)</div>
+<div class="card"><div id="rSalesProducts"></div></div>
+
+<div class="hr"></div>
+<div class="hint">Insert Performansı (ürün bazlı)</div>
+<div class="card"><div id="rInsertPerf"></div></div>
+
+<div class="hr"></div>
+<div class="hint">İade Nedenleri</div>
+<div class="card"><div id="rReturnReasons"></div></div>
+
 
 <div class="hr"></div>
 <div class="hint">Detay (Tür bazlı)</div>
@@ -545,6 +557,7 @@ body.single header{position:sticky; top:0;}
 /* V16_REPORT_DETAIL_STOCK_CSV */
 /* V17_HQ_REPORTS */
 /* V18_SINGLE_EXPORT_ALERTS */
+/* V19_MANAGER_REPORTS_SAFE */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -1820,6 +1833,91 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
   // sayfa açılır açılmaz: alarm + gün etiketi doğru olsun
   try{ const db=loadDB(); const ops=opsInDays(db, REPORT_DAYS); renderAlerts(db, ops, REPORT_DAYS); }catch(e){}
+});
+
+
+/* V19_MANAGER_REPORTS_SAFE */
+
+function renderManagerPanels(days){
+  const db = loadDB();
+  const ops = opsInDays(db, days);
+
+  const salesBox = $("rSalesProducts");
+  const insertBox = $("rInsertPerf");
+  const returnBox = $("rReturnReasons");
+
+  if(salesBox){
+    const map = {};
+    ops.forEach(o=>{
+      if(o.type==="satis"){
+        map[o.pid] = (map[o.pid]||0) + Number(o.qty||0);
+      }
+    });
+
+    const rows = Object.entries(map)
+      .sort((a,b)=>b[1]-a[1])
+      .slice(0,10)
+      .map(([pid,qty])=>{
+        const p = (db.products||[]).find(x=>x.id===pid);
+        const name = p ? p.name : pid;
+        return "<div>"+name+" → <b>"+qty+"</b></div>";
+      }).join("");
+
+    salesBox.innerHTML = rows || "<div class='hint'>Satış yok</div>";
+  }
+
+  if(insertBox){
+    const map = {};
+    ops.forEach(o=>{
+      if(o.type==="dagilim" && String(o.sub||"").toLowerCase().includes("insert")){
+        map[o.pid] = map[o.pid] || {d:0,s:0};
+        map[o.pid].d += Number(o.qty||0);
+      }
+      if(o.type==="satis" && String(o.sub||"").toLowerCase().includes("insert")){
+        map[o.pid] = map[o.pid] || {d:0,s:0};
+        map[o.pid].s += Number(o.qty||0);
+      }
+    });
+
+    const rows = Object.entries(map)
+      .map(([pid,obj])=>{
+        const p = (db.products||[]).find(x=>x.id===pid);
+        const name = p ? p.name : pid;
+        const ratio = obj.d>0 ? Math.round((obj.s/obj.d)*100) : 0;
+        return "<div>"+name+" → %"+ratio+" ("+obj.s+"/"+obj.d+")</div>";
+      }).join("");
+
+    insertBox.innerHTML = rows || "<div class='hint'>Insert verisi yok</div>";
+  }
+
+  if(returnBox){
+    const map = {};
+    ops.forEach(o=>{
+      if(o.type==="iade"){
+        const sub = o.sub || "Diğer";
+        map[sub] = (map[sub]||0) + Number(o.qty||0);
+      }
+    });
+
+    const rows = Object.entries(map)
+      .sort((a,b)=>b[1]-a[1])
+      .slice(0,10)
+      .map(([sub,qty])=>{
+        return "<div>"+sub+" → <b>"+qty+"</b></div>";
+      }).join("");
+
+    returnBox.innerHTML = rows || "<div class='hint'>İade yok</div>";
+  }
+}
+
+const _reportForDays_V19_SAFE = reportForDays;
+reportForDays = function(days){
+  _reportForDays_V19_SAFE(days);
+  try{ renderManagerPanels(days); }catch(e){}
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  try{ renderManagerPanels(1); }catch(e){}
 });
 
 </script>
