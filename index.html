@@ -130,6 +130,20 @@
   border-color:rgba(239,68,68,.35);
 }
 
+
+/* V16_REPORT_DETAIL_STOCK_CSV */
+.rGrid2{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+@media(min-width:900px){.rGrid2{grid-template-columns:1fr 1fr}}
+.rRow{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.rKey{font-weight:950}
+.rVal{font-weight:950}
+.rTiny{color:var(--muted);font-size:12px;margin-top:4px}
+.miniTable{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.miniLine{padding:10px 12px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.02)}
+.miniLine .rRow{align-items:flex-start}
+.badge{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:12px;color:var(--muted)}
+.badge b{color:var(--text)}
+
 </style>
 </head>
 <body>
@@ -182,6 +196,8 @@
           <button id="btnReport7" class="btn btnBLUE" type="button">7g</button>
           <button id="btnReport30" class="btn btnBLUE" type="button">30g</button>
           <button id="btnUndo" class="btn" type="button">Geri Al</button>
+        
+          <button id="btnCSV" class="btn" type="button">CSV</button>
         </div>
       </div>
 
@@ -198,6 +214,19 @@
       <div class="hr"></div>
       <div class="hint">Tür dağılımı</div>
       <div class="list" id="rTypes"></div>
+
+<div class="hr"></div>
+<div class="hint">Detay (Tür bazlı)</div>
+<div class="miniTable" id="rTypeTotals"></div>
+
+<div class="hr"></div>
+<div class="hint">Alt kırılım (Seçili aralık)</div>
+<div class="miniTable" id="rSubTotals"></div>
+
+<div class="hr"></div>
+<div class="hint">Stok Snapshot (Mevcut net stok)</div>
+<div class="miniTable" id="rStockNow"></div>
+
 
       <div class="hr"></div>
       <div class="hint">Akıl</div>
@@ -292,6 +321,7 @@
 /* V12_KOLI_MODE_MODAL_OPAQUE_V2 */
 /* V14_FASTOPS_SOLID */
 /* V15_UNDO_DELETE_OPS */
+/* V16_REPORT_DETAIL_STOCK_CSV */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -1155,6 +1185,177 @@ function reportForDays(days){
   if(brain.length===0) brain.push("🟩 Stabil: kritik sinyal yok.");
   $("rBrain").innerHTML = brain.map(t=>`<div class="item"><div class="name">${escapeHTML(t)}</div></div>`).join("");
 }
+
+/* V16_REPORT_DETAIL_STOCK_CSV */
+let REPORT_LAST_DAYS = 1;
+
+function fmtInt(n){
+  try{ return String(Math.trunc(Number(n)||0)); }catch(e){ return "0"; }
+}
+
+function typeLabelByKey(k){
+  const t = (typeof TYPE_DEF!=="undefined") ? TYPE_DEF.find(x=>x.k===k) : null;
+  return t ? (t.label || k) : k;
+}
+
+function computeTypeTotals(db, ops){
+  // tür bazlı + / - ve net
+  const out = new Map(); // typeKey -> {label, dirPlus, dirMinus}
+  for(const o of ops){
+    const k = o.type || "";
+    if(!k) continue;
+    const cur = out.get(k) || {label: (o.typeLabel||typeLabelByKey(k)||k), plus:0, minus:0};
+    const q = Number(o.qty||0);
+    if(o.dir==="+") cur.plus += q; else cur.minus += q;
+    out.set(k, cur);
+  }
+  return [...out.entries()].map(([k,v])=>({k, ...v, net:(v.plus-v.minus)}))
+    .sort((a,b)=> (Math.abs(b.plus)+Math.abs(b.minus)) - (Math.abs(a.plus)+Math.abs(a.minus)));
+}
+
+function computeSubTotals(db, ops){
+  // alt kırılım: typeLabel + sub
+  const out = new Map(); // key -> qty
+  for(const o of ops){
+    const t = (o.typeLabel||typeLabelByKey(o.type)||o.type||"Tür");
+    const sub = (o.sub||"").trim() || "Alt yok";
+    const key = t + " :: " + sub;
+    out.set(key, (out.get(key)||0) + Number(o.qty||0));
+  }
+  return [...out.entries()].map(([k,v])=>({k,v})).sort((a,b)=>b.v-a.v);
+}
+
+function renderTypeTotals(rows){
+  const box = $("rTypeTotals");
+  if(!box) return;
+  if(!rows.length){
+    box.innerHTML = `<div class="miniLine"><div class="hint">Detay veri yok.</div></div>`;
+    return;
+  }
+  box.innerHTML = rows.slice(0,12).map(r=>`
+    <div class="miniLine">
+      <div class="rRow">
+        <div class="rKey">${escapeHTML(r.label||r.k)}</div>
+        <div class="badge">net <b>${fmtInt(r.net)}</b></div>
+      </div>
+      <div class="rTiny">+${fmtInt(r.plus)} / -${fmtInt(r.minus)}</div>
+    </div>
+  `).join("");
+}
+
+function renderSubTotals(rows){
+  const box = $("rSubTotals");
+  if(!box) return;
+  if(!rows.length){
+    box.innerHTML = `<div class="miniLine"><div class="hint">Alt kırılım veri yok.</div></div>`;
+    return;
+  }
+  box.innerHTML = rows.slice(0,18).map(r=>{
+    const parts = String(r.k).split(" :: ");
+    const t = parts[0] || "Tür";
+    const sub = parts.slice(1).join(" :: ") || "Alt yok";
+    return `
+      <div class="miniLine">
+        <div class="rRow">
+          <div style="flex:1">
+            <div class="rKey">${escapeHTML(sub)}</div>
+            <div class="rTiny">${escapeHTML(t)}</div>
+          </div>
+          <div class="badge"><b>${fmtInt(r.v)}</b></div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderStockNow(){
+  const box = $("rStockNow");
+  if(!box) return;
+
+  const db = loadDB();
+  const arr = (db.products||[]).map(p=>{
+    const net = computeStock(db, p.id);
+    return {name:p.name||"", id:p.id, net};
+  }).sort((a,b)=> b.net - a.net);
+
+  if(!arr.length){
+    box.innerHTML = `<div class="miniLine"><div class="hint">Ürün yok.</div></div>`;
+    return;
+  }
+
+  box.innerHTML = arr.slice(0,25).map(x=>`
+    <div class="miniLine">
+      <div class="rRow">
+        <div class="rKey">${escapeHTML(x.name)}</div>
+        <div class="badge">stok <b>${fmtInt(x.net)}</b></div>
+      </div>
+      <div class="rTiny">ID: ${escapeHTML(String(x.id||"").slice(0,8))}</div>
+    </div>
+  `).join("");
+}
+
+function exportOpsCSV(days){
+  const db = loadDB();
+  const ops = opsInDays(db, days).sort((a,b)=>(b.ts||0)-(a.ts||0));
+
+  const header = ["ts","date","product","dir","type","sub","qty","unitMode","packCount","packSize","note"];
+  const lines = [header.join(",")];
+
+  const pmap = new Map((db.products||[]).map(p=>[p.id, p.name||""]));
+
+  function esc(v){
+    const s = String(v??"").replace(/"/g,'""');
+    return `"${s}"`;
+  }
+
+  for(const o of ops){
+    const dt = new Date(o.ts||0);
+    const row = [
+      dt.toISOString(),
+      (o.day||dt.toISOString().slice(0,10)),
+      (pmap.get(o.pid)||""),
+      (o.dir||""),
+      (o.typeLabel||o.type||""),
+      (o.sub||""),
+      (o.qty||0),
+      (o.unitMode||""),
+      (o.packCount||0),
+      (o.packSize||0),
+      (o.note||""),
+    ].map(esc);
+    lines.push(row.join(","));
+  }
+
+  const csv = lines.join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `stok_kontrol_ops_${days}g_${todayISO()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(e){} }, 2000);
+}
+
+// reportForDays'e “detay render” hook
+const _reportForDays_V16 = reportForDays;
+reportForDays = function(days){
+  REPORT_LAST_DAYS = days;
+  _reportForDays_V16(days);
+  const db = loadDB();
+  const ops = opsInDays(db, days);
+  renderTypeTotals(computeTypeTotals(db, ops));
+  renderSubTotals(computeSubTotals(db, ops));
+  renderStockNow();
+};
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  if($("btnCSV")){
+    $("btnCSV").onclick = ()=> exportOpsCSV(REPORT_LAST_DAYS || 1);
+  }
+});
+
 
 function reportToday(){ reportForDays(1); }
 
