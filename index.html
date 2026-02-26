@@ -375,6 +375,22 @@ body.compact .pill{padding:8px 10px}
   color:var(--text);
 }
 
+
+/* V24_COMPACT_MODE */
+.compact .miniRow,
+.compact .list,
+.compact .actions,
+.compact .tag{
+  display:none !important;
+}
+.modeSwitch{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  cursor:pointer;
+  font-weight:800;
+}
+
 </style>
 </head>
 <body>
@@ -391,6 +407,12 @@ body.compact .pill{padding:8px 10px}
 
       <button class="btn" id="btnSingle" type="button" style="padding:10px 12px;border-radius:999px">Tek Ekran</button>
     </div>
+  </div>
+
+  <div style="margin-top:8px">
+    <span class="modeSwitch" onclick="toggleCompact()">
+      ⚙ Detay Modu Aç/Kapat
+    </span>
   </div>
 </header>
 
@@ -598,6 +620,7 @@ body.compact .pill{padding:8px 10px}
 /* V20_FORECAST_ENGINE */
 /* V21_RISK_ENGINE */
 /* V22_UI_DECLUTTER */
+/* V24_COMPACT_MODE */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -877,6 +900,27 @@ function computeStock(db, pid){
 }
 
 /* ====== RENDER PRODUCTS ====== */
+
+/* V24_COMPACT_MODE */
+let COMPACT_MODE = true;
+
+function applyCompact(){
+  const root=document.body;
+  if(COMPACT_MODE){
+    root.classList.add("compact");
+  }else{
+    root.classList.remove("compact");
+  }
+}
+
+function toggleCompact(){
+  COMPACT_MODE=!COMPACT_MODE;
+  applyCompact();
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  applyCompact();
+});
 function renderProducts(){
   const db=loadDB();
   const q=($("inSearch").value||"").trim().toLowerCase();
