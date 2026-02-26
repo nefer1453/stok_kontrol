@@ -132,6 +132,170 @@
 
 
 /* V16_REPORT_DETAIL_STOCK_CSV */
+
+/* V17_HQ_REPORTS */
+function sumQty(list){
+  let n=0;
+  for(const o of list){ n += Number(o.qty||0); }
+  return n;
+}
+
+function filterType(ops, typeKey){
+  return ops.filter(o => (o.type===typeKey) || (String(o.typeLabel||"").toLowerCase().includes(typeKey)));
+}
+
+function subBreakdown(list){
+  const m=new Map();
+  for(const o of list){
+    const k=(o.sub||"").trim() || "Alt yok";
+    m.set(k, (m.get(k)||0) + Number(o.qty||0));
+  }
+  return [...m.entries()].sort((a,b)=>b[1]-a[1]);
+}
+
+function dailySeries(ops, typeKey, days){
+  // son N gün (bugün dahil) typeKey toplamı
+  const out=[];
+  const now=new Date();
+  for(let i=days-1;i>=0;i--){
+    const d=new Date(now.getTime()-i*24*3600*1000);
+    const key=d.toISOString().slice(0,10);
+    let total=0;
+    for(const o of ops){
+      const day=o.day || (new Date(o.ts||0).toISOString().slice(0,10));
+      if(day!==key) continue;
+      if(typeKey && o.type!==typeKey) continue;
+      total += Number(o.qty||0);
+    }
+    out.push([key,total]);
+  }
+  return out;
+}
+
+function renderHQSales(db, ops, days){
+  const box=$("rHQSales");
+  if(!box) return;
+
+  const sales = ops.filter(o=>o.type==="satis");
+  const total = sumQty(sales);
+
+  const bd = subBreakdown(sales).slice(0,10);
+  const series = dailySeries(ops, "satis", Math.min(7, Math.max(1, days)));
+
+  const bdHtml = bd.length ? bd.map(([k,v])=>`
+    <div class="miniLine">
+      <div class="rRow">
+        <div class="rKey">${escapeHTML(k)}</div>
+        <div class="badge"><b>${fmtInt(v)}</b></div>
+      </div>
+    </div>
+  `).join("") : `<div class="miniLine"><div class="hint">Satış alt kırılım yok.</div></div>`;
+
+  const serHtml = series.map(([d,v])=>`
+    <div class="miniLine">
+      <div class="rRow">
+        <div class="rKey">${escapeHTML(d.slice(5))}</div>
+        <div class="badge"><b>${fmtInt(v)}</b></div>
+      </div>
+    </div>
+  `).join("");
+
+  box.innerHTML = `
+    <div class="miniLine">
+      <div class="rRow">
+        <div class="rKey">Toplam Satış</div>
+        <div class="badge">adet <b>${fmtInt(total)}</b></div>
+      </div>
+      <div class="rTiny">Aralık: ${fmtInt(days)} gün • “Satış (-)” işlemlerinden</div>
+    </div>
+    <div class="rTiny" style="margin-top:8px">Satış alt kırılım</div>
+    ${bdHtml}
+    <div class="rTiny" style="margin-top:8px">Günlük satış (son ${Math.min(7, Math.max(1, days))} gün)</div>
+    ${serHtml}
+  `;
+}
+
+function renderHQInsert(db, ops, days){
+  const box=$("rHQInsert");
+  if(!box) return;
+
+  const dist = ops.filter(o=>o.type==="dagilim").filter(o=>String(o.sub||"").toLowerCase().includes("insert"));
+  const sales = ops.filter(o=>o.type==="satis").filter(o=>String(o.sub||"").toLowerCase().includes("insert"));
+
+  const dTot = sumQty(dist);
+  const sTot = sumQty(sales);
+  const ratio = dTot>0 ? (sTot/dTot) : 0;
+  const net = dTot - sTot;
+
+  let signal = "🟩 Normal";
+  if(dTot>0 && ratio < 0.35) signal = "🟥 Zayıf (insert satış düşük)";
+  else if(dTot>0 && ratio < 0.60) signal = "🟧 Orta";
+
+  box.innerHTML = `
+    <div class="miniLine">
+      <div class="rRow">
+        <div class="rKey">Insert Dağılım (+)</div>
+        <div class="badge"><b>${fmtInt(dTot)}</b></div>
+      </div>
+      <div class="rTiny">“Dağılım (+)” içinde alt kırılımı “Insert” olanlar</div>
+    </div>
+    <div class="miniLine">
+      <div class="rRow">
+        <div class="rKey">Insert Satış (-)</div>
+        <div class="badge"><b>${fmtInt(sTot)}</b></div>
+      </div>
+      <div class="rTiny">“Satış (-)” içinde alt kırılımı “Insert satış” olanlar</div>
+    </div>
+    <div class="miniLine">
+      <div class="rRow">
+        <div class="rKey">Insert Dönüşüm</div>
+        <div class="badge">% <b>${Math.round(ratio*100)}</b></div>
+      </div>
+      <div class="rTiny">${signal} • Net insert (dağılım - satış): ${fmtInt(net)}</div>
+    </div>
+  `;
+}
+
+function renderHQReturns(db, ops, days){
+  const box=$("rHQReturns");
+  if(!box) return;
+
+  const ret = ops.filter(o=>o.type==="iade");
+  const total = sumQty(ret);
+  const bd = subBreakdown(ret).slice(0,15);
+
+  box.innerHTML = `
+    <div class="miniLine">
+      <div class="rRow">
+        <div class="rKey">Toplam İade</div>
+        <div class="badge">adet <b>${fmtInt(total)}</b></div>
+      </div>
+      <div class="rTiny">Aralık: ${fmtInt(days)} gün • “İade (-)” işlemlerinden</div>
+    </div>
+    ${
+      bd.length ? bd.map(([k,v])=>`
+        <div class="miniLine">
+          <div class="rRow">
+            <div class="rKey">${escapeHTML(k)}</div>
+            <div class="badge"><b>${fmtInt(v)}</b></div>
+          </div>
+        </div>
+      `).join("") : `<div class="miniLine"><div class="hint">İade sebep kırılımı yok.</div></div>`
+    }
+  `;
+}
+
+// reportForDays sonrası hook (V16 varsa onunla uyumlu)
+const _reportForDays_V17 = reportForDays;
+reportForDays = function(days){
+  _reportForDays_V17(days);
+  const db = loadDB();
+  const ops = opsInDays(db, days);
+  renderHQSales(db, ops, days);
+  renderHQInsert(db, ops, days);
+  renderHQReturns(db, ops, days);
+};
+
 .rGrid2{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
 @media(min-width:900px){.rGrid2{grid-template-columns:1fr 1fr}}
 .rRow{display:flex;justify-content:space-between;gap:10px;align-items:center}
@@ -232,6 +396,20 @@
       <div class="hint">Akıl</div>
       <div class="list" id="rBrain"></div>
 
+<div class="hr"></div>
+<div class="hint">Merkez Raporu (seçili aralık)</div>
+
+<div class="miniTable" id="rHQSales"></div>
+
+<div class="hr"></div>
+<div class="hint">Insert Performansı (seçili aralık)</div>
+<div class="miniTable" id="rHQInsert"></div>
+
+<div class="hr"></div>
+<div class="hint">İade Sebepleri (seçili aralık)</div>
+<div class="miniTable" id="rHQReturns"></div>
+
+
       <div class="hr"></div>
       <button class="btn" id="btnSkorTest" type="button">Skor Test (debug)</button>
       <div class="hint" style="margin-top:8px">Sadece test: ilk ürüne göre skor/çıktı verir.</div>
@@ -322,6 +500,7 @@
 /* V14_FASTOPS_SOLID */
 /* V15_UNDO_DELETE_OPS */
 /* V16_REPORT_DETAIL_STOCK_CSV */
+/* V17_HQ_REPORTS */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
