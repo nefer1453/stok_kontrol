@@ -341,6 +341,40 @@ body.single header{position:sticky; top:0;}
   .tag, .badge{border:1px solid #ddd !important; background:#fff !important; color:#111 !important}
 }
 
+
+/* V22_UI_DECLUTTER */
+/* Kompakt mod: daha az padding, daha az satır, daha çok iş */
+body.compact .card{padding:12px}
+body.compact .item{padding:10px;border-radius:16px}
+body.compact .miniRow{gap:6px}
+body.compact .btn{padding:10px 12px;border-radius:14px}
+body.compact .smallBtn{padding:9px 10px;border-radius:14px}
+body.compact .muted{display:none}
+body.compact .hint{font-size:11px}
+body.compact .netBig{font-size:22px}
+
+/* Detay kapalı mod: raporda sadece KPI + risk + “en çok ürünler” görünsün */
+body.hideDetails #rTypes,
+body.hideDetails #rBrain,
+body.hideDetails #btnSkorTest{display:none !important;}
+/* Risk paneli varsa kalsın; yoksa boş yere yer kaplamasın */
+body.hideDetails #rRisk:empty{display:none !important;}
+
+/* Ürün kartında etiketleri kıs (Net etiketi gereksiz, zaten büyük sayı var) */
+body.compact .tag{padding:6px 8px;font-size:11px}
+body.compact .pill{padding:8px 10px}
+
+/* Header kontrol butonları daha “buton gibi” olsun */
+#btnCompact, #btnDetails{
+  cursor:pointer;
+  user-select:none;
+}
+#btnCompact.on, #btnDetails.on{
+  background:rgba(37,99,235,.18);
+  border-color:rgba(37,99,235,.35);
+  color:var(--text);
+}
+
 </style>
 </head>
 <body>
@@ -352,6 +386,9 @@ body.single header{position:sticky; top:0;}
         <div class="sub">v1 — ürün + işlemler + rapor + “akıl” çekirdeği</div>
       </div>
       <div class="chip" id="chipMeta">Local • Hazır</div>
+      <button class="chip" id="btnCompact" type="button">Kompakt</button>
+      <button class="chip" id="btnDetails" type="button">Detay</button>
+
       <button class="btn" id="btnSingle" type="button" style="padding:10px 12px;border-radius:999px">Tek Ekran</button>
     </div>
   </div>
@@ -560,6 +597,7 @@ body.single header{position:sticky; top:0;}
 /* V19_MANAGER_REPORTS_SAFE */
 /* V20_FORECAST_ENGINE */
 /* V21_RISK_ENGINE */
+/* V22_UI_DECLUTTER */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -2121,6 +2159,55 @@ computeForecast = function(){
     renderRiskPanel(rows);
   }catch(e){}
 };
+
+
+
+/* V22_UI_DECLUTTER */
+(function(){
+  const KEY_COMPACT = "stok_view_compact_v1";
+  const KEY_DETAILS = "stok_view_details_v1"; // 1=detay açık
+
+  function setBodyFlags(){
+    const compact = localStorage.getItem(KEY_COMPACT) === "1";
+    const details = localStorage.getItem(KEY_DETAILS) === "1";
+
+    document.body.classList.toggle("compact", compact);
+    document.body.classList.toggle("hideDetails", !details);
+
+    const bC = document.getElementById("btnCompact");
+    const bD = document.getElementById("btnDetails");
+    if(bC) bC.classList.toggle("on", compact);
+    if(bD) bD.classList.toggle("on", details);
+
+    if(bC) bC.textContent = compact ? "Kompakt ✓" : "Kompakt";
+    if(bD) bD.textContent = details ? "Detay ✓" : "Detay";
+  }
+
+  function toggleCompact(){
+    const cur = localStorage.getItem(KEY_COMPACT) === "1";
+    localStorage.setItem(KEY_COMPACT, cur ? "0" : "1");
+    setBodyFlags();
+  }
+
+  function toggleDetails(){
+    const cur = localStorage.getItem(KEY_DETAILS) === "1";
+    localStorage.setItem(KEY_DETAILS, cur ? "0" : "1");
+    setBodyFlags();
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    // default: kompakt açık, detay kapalı
+    if(localStorage.getItem(KEY_COMPACT) === null) localStorage.setItem(KEY_COMPACT, "1");
+    if(localStorage.getItem(KEY_DETAILS) === null) localStorage.setItem(KEY_DETAILS, "0");
+
+    const bC = document.getElementById("btnCompact");
+    const bD = document.getElementById("btnDetails");
+    if(bC) bC.addEventListener("click", toggleCompact);
+    if(bD) bD.addEventListener("click", toggleDetails);
+
+    setBodyFlags();
+  });
+})();
 
 </script>
 </body>
