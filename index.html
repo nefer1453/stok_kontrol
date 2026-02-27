@@ -399,6 +399,44 @@ body.compact .pill{padding:8px 10px}
 .stockRed{ color:#ef4444; font-weight:1000; }
 .miniSpeed{ font-size:12px; margin-top:6px; opacity:.9; color:var(--muted); }
 
+
+/* V26_TABS_DECLUTTER */
+.tabsBar{
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(11,18,32,.78);
+  backdrop-filter: blur(10px);
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.tabBtn{
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.05);
+  color: var(--muted);
+  padding: 10px 12px;
+  border-radius: 999px;
+  font-weight: 950;
+  cursor: pointer;
+  user-select:none;
+}
+.tabBtnOn{
+  color: var(--text);
+  border-color: rgba(37,99,235,.45);
+  background: rgba(37,99,235,.20);
+}
+.tabHint{
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+.hiddenPanel{ display:none !important; }
+
 </style>
 </head>
 <body>
@@ -425,9 +463,18 @@ body.compact .pill{padding:8px 10px}
 </header>
 
 <main class="wrap">
+  <!-- V26: Sekmeli düzen (ekran kalabalığını böl) -->
+  <div class="tabsBar" id="tabsBar">
+    <button class="tabBtn tabBtnOn" data-tab="products" type="button">Ürün</button>
+    <button class="tabBtn" data-tab="report" type="button">Rapor</button>
+    <button class="tabBtn" data-tab="ops" type="button">İşlemler</button>
+    <button class="tabBtn" data-tab="alarm" type="button">Alarm</button>
+  </div>
+  <div class="tabHint" id="tabHint">Ürün ekranı: ürün ekle/ara + stok kartları + hızlı işlem</div>
+
   <div class="grid">
     <!-- SOL -->
-    <section class="card">
+    <section class="card" id="cardProducts">
       <h2>Ürün</h2>
       <div class="hint">Ürün ekle / ara / stok kartları</div>
       <div class="row" style="margin-top:10px">
@@ -537,6 +584,35 @@ body.compact .pill{padding:8px 10px}
       <div class="hint" style="margin-top:8px">Sadece test: ilk ürüne göre skor/çıktı verir.</div>
     </section>
   </div>
+
+  <!-- V26: Ops panel -->
+  <section class="card hiddenPanel" id="cardOps" style="margin-top:14px">
+    <h2>İşlemler</h2>
+    <div class="hint">Son işlemler (en yeni üstte). Hızlı kontrol için.</div>
+    <div class="hr"></div>
+    <div class="row">
+      <button class="btn smallBtn" id="btnOpsRefresh" type="button">Yenile</button>
+      <button class="btn smallBtn btnBAD" id="btnOpsClear" type="button">Tüm işlemleri sil (dikkat)</button>
+    </div>
+    <div class="hr"></div>
+    <div class="list" id="opsList"></div>
+  </section>
+
+  <!-- V26: Alarm panel -->
+  <section class="card hiddenPanel" id="cardAlarm" style="margin-top:14px">
+    <h2>Alarm</h2>
+    <div class="hint">Bu ekran “kritik stok / hız / risk” gibi sinyaller için ayrıldı. Şimdilik sade.</div>
+    <div class="hr"></div>
+    <div class="item">
+      <div class="name">Plan</div>
+      <div class="muted">
+        • Kritik ürün pinleme (varsa) burada toplanacak<br/>
+        • Insert/iskonto/verim alarmı burada olacak<br/>
+        • “Merkez bakışı” özetleri burada büyütülecek
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <!-- MODAL -->
@@ -630,6 +706,7 @@ body.compact .pill{padding:8px 10px}
 /* V22_UI_DECLUTTER */
 /* V24_COMPACT_MODE */
 /* V25_STOCK_COLOR_SPEED_V2 */
+/* V26_TABS_DECLUTTER */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -2303,6 +2380,130 @@ computeForecast = function(){
     if(bD) bD.addEventListener("click", toggleDetails);
 
     setBodyFlags();
+  });
+})();
+
+
+/* V26_TABS_DECLUTTER */
+(function(){
+  const TABKEY = "stok_kontrol_tab_v26";
+
+  function setHint(tab){
+    const h = document.getElementById("tabHint");
+    if(!h) return;
+    if(tab==="products") h.textContent = "Ürün ekranı: ürün ekle/ara + stok kartları + hızlı işlem";
+    else if(tab==="report") h.textContent = "Rapor ekranı: 1g/7g/30g özet + yönetici bakışı";
+    else if(tab==="ops") h.textContent = "İşlemler ekranı: son işlemler listesi (hızlı kontrol)";
+    else if(tab==="alarm") h.textContent = "Alarm ekranı: kritik sinyaller / uyarılar";
+    else h.textContent = "";
+  }
+
+  function showTab(tab){
+    const cP = document.getElementById("cardProducts");
+    const cR = document.getElementById("cardReport");
+    const cO = document.getElementById("cardOps");
+    const cA = document.getElementById("cardAlarm");
+
+    // Grid düzeni: products/report aslında grid içindeydi.
+    // Biz sadece kartları görünür/gizli yapıyoruz.
+    if(cP) cP.classList.toggle("hiddenPanel", tab!=="products");
+    if(cR) cR.classList.toggle("hiddenPanel", tab!=="report");
+    if(cO) cO.classList.toggle("hiddenPanel", tab!=="ops");
+    if(cA) cA.classList.toggle("hiddenPanel", tab!=="alarm");
+
+    // tab buton state
+    document.querySelectorAll("#tabsBar .tabBtn").forEach(b=>{
+      const on = (b.getAttribute("data-tab")===tab);
+      b.classList.toggle("tabBtnOn", on);
+    });
+
+    setHint(tab);
+    try{ localStorage.setItem(TABKEY, tab); }catch(e){}
+    if(tab==="ops"){ try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){} }
+  }
+
+  function safeText(x){ return (x===null||x===undefined) ? "" : String(x); }
+
+  function renderOpsPanel(){
+    const list = document.getElementById("opsList");
+    if(!list) return;
+
+    const db = (typeof loadDB==="function") ? loadDB() : {products:[], ops:[]};
+    const prodById = new Map((db.products||[]).map(p=>[p.id,p]));
+
+    const ops = (db.ops||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,120);
+    if(!ops.length){
+      list.innerHTML = '<div class="item"><div class="hint">İşlem yok.</div></div>';
+      return;
+    }
+
+    list.innerHTML = ops.map(o=>{
+      const p = prodById.get(o.pid);
+      const name = p ? p.name : ("(silinmiş ürün) " + safeText(o.pid).slice(0,8));
+      const sign = (o.dir==="+") ? "+" : "-";
+      const dt = new Date(o.ts||Date.now()).toLocaleString("tr-TR");
+      const type = safeText(o.typeLabel || o.type || "");
+      const sub = safeText(o.sub || "");
+      const note = safeText(o.note || "");
+      const extra = (o.unitMode==="koli" && o.packCount && o.packSize) ? (" • "+o.packCount+" koli × "+o.packSize) : "";
+      return `
+        <div class="item" style="background:rgba(255,255,255,.02)">
+          <div class="row" style="justify-content:space-between;align-items:flex-start">
+            <div style="flex:1">
+              <div class="name">${sign}${safeText(o.qty)} • ${escapeHTML(name)}</div>
+              <div class="muted">${escapeHTML(type)} ${sub?(" • "+escapeHTML(sub)):""}${extra}${note?(" • "+escapeHTML(note)):""}</div>
+            </div>
+            <div class="tag">${escapeHTML(dt)}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // global yap ki diğer yerlerden çağrabilelim
+  window.renderOpsPanel = renderOpsPanel;
+  const _renderProducts_v26 = (typeof renderProducts==="function") ? renderProducts : null;
+
+  // renderProducts çalıştıkça ops panel de güncellensin (ama sekme ops değilse bile sorun değil)
+  if(typeof _renderProducts_v26 === "function"){
+    window.renderProducts = function(){
+      _renderProducts_v26();
+      try{ renderOpsPanel(); }catch(e){}
+    };
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    // tab click
+    const bar = document.getElementById("tabsBar");
+    if(bar){
+      bar.querySelectorAll(".tabBtn").forEach(btn=>{
+        btn.addEventListener("click", ()=> showTab(btn.getAttribute("data-tab")));
+      });
+    }
+
+    // ops panel buttons
+    const r = document.getElementById("btnOpsRefresh");
+    if(r) r.onclick = ()=> renderOpsPanel();
+
+    const c = document.getElementById("btnOpsClear");
+    if(c) c.onclick = ()=>{
+      const ok = confirm("Tüm işlemleri silmek istiyor musun? Bu geri alınamaz.");
+      if(!ok) return;
+      const db = loadDB();
+      db.ops = [];
+      saveDB(db);
+      try{ renderProducts(); }catch(e){}
+      renderOpsPanel();
+      alert("İşlemler silindi.");
+    };
+
+    // restore last tab
+    let t = "products";
+    try{ t = localStorage.getItem("stok_kontrol_tab_v26") || "products"; }catch(e){}
+    if(!["products","report","ops","alarm"].includes(t)) t="products";
+    showTab(t);
+    // ops panel ilk çizim
+    try{ renderOpsPanel(); }catch(e){}
   });
 })();
 
