@@ -475,6 +475,106 @@ body.compact .pill{padding:8px 10px}
 .reportFilterRow select{min-width:220px}
 .reportMiniTitle{color:var(--muted);font-size:12px;margin-top:10px}
 
+
+/* V291_MINT_LIGHT_UI */
+/* Açık, ferah tema: motor aynı, sadece kabuk değişiyor */
+:root{
+  --mint:#10b981;
+  --mint2:#14b8a6;
+  --bg:#f4f7fb;
+  --card:#ffffff;
+  --text:#0b1220;
+  --muted:#5b667a;
+  --line:rgba(15,23,42,.12);
+  --shadow:0 10px 30px rgba(2,6,23,.08);
+}
+
+/* genel zemin */
+body{
+  background:var(--bg) !important;
+  color:var(--text) !important;
+}
+
+/* eski koyu header'ı “mint bar” gibi hissettir */
+header{
+  background: linear-gradient(90deg, var(--mint), var(--mint2)) !important;
+  color:#ffffff !important;
+  border-bottom:1px solid rgba(255,255,255,.25) !important;
+}
+
+/* kartlar */
+.card, section.card, .panel, .box, .pill, .kpi, .row, .item, .prodCard{
+  background:var(--card) !important;
+  border:1px solid var(--line) !important;
+  box-shadow:var(--shadow) !important;
+}
+
+/* metin tonları */
+.muted, .hint, .sub, .small, .desc, .smallKpiTitle{
+  color:var(--muted) !important;
+}
+
+/* butonlar: mint ağırlıklı, sade */
+button, .btn{
+  border-radius:14px !important;
+}
+button.primary, .btnPrimary{
+  background: linear-gradient(90deg, var(--mint), var(--mint2)) !important;
+  color:#fff !important;
+  border:0 !important;
+}
+button.ghost, .btnGhost{
+  background: rgba(16,185,129,.10) !important;
+  border:1px solid rgba(16,185,129,.25) !important;
+  color:var(--text) !important;
+}
+
+/* içerik altta nav’a çarpmasın */
+main{ padding-bottom: 92px !important; }
+
+/* bottom nav */
+.bottomNav{
+  position:fixed;
+  left:0; right:0; bottom:0;
+  z-index:9999;
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  background:rgba(255,255,255,.92);
+  backdrop-filter: blur(10px);
+  border-top:1px solid var(--line);
+}
+.bottomNav .navRow{
+  display:flex;
+  gap:10px;
+}
+.navBtn{
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:12px 10px;
+  border-radius:16px;
+  border:1px solid var(--line);
+  background:#fff;
+  color:var(--muted);
+  font-weight:950;
+  cursor:pointer;
+}
+.navBtnOn{
+  color:var(--text);
+  border-color: rgba(16,185,129,.45);
+  background: rgba(16,185,129,.14);
+}
+
+/* panel görünürlüğü */
+.v291Panel{ display:none; }
+.v291PanelOn{ display:block; }
+
+/* üstteki eski sekmeler kalabalık yapıyorsa hafiflet */
+.tabs, .tabRow, #tabsBar{
+  opacity:.70;
+}
+
 </style>
 </head>
 <body>
@@ -762,6 +862,7 @@ body.compact .pill{padding:8px 10px}
 /* V27_DECLUTTER_PRODUCTS_MOVE_HISTORY */
 /* V28_ALARM_TAB */
 /* V29_CENTER_KPI_REPORT_FILTER */
+/* V291_MINT_LIGHT_UI */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -2894,6 +2995,75 @@ document.addEventListener("DOMContentLoaded", ()=>{
   try{ setAlarmDays(7); }catch(e){}
 });
 
+
+/* V291_MINT_LIGHT_UI */
+(function(){
+  const KEY="stok_v291_tab";
+  const PANELS=["cardProducts","cardOps","cardAlarm","cardReport"];
+
+  function ensurePanels(){
+    for(const id of PANELS){
+      const el=document.getElementById(id);
+      if(el){
+        el.classList.add("v291Panel");
+      }
+    }
+  }
+
+  function show(id){
+    ensurePanels();
+
+    for(const pid of PANELS){
+      const el=document.getElementById(pid);
+      if(el){
+        el.classList.remove("v291PanelOn");
+      }
+    }
+    const active=document.getElementById(id);
+    if(active){
+      active.classList.add("v291PanelOn");
+    }
+
+    document.querySelectorAll(".navBtn").forEach(b=>{
+      b.classList.toggle("navBtnOn", b.getAttribute("data-v291")===id);
+    });
+
+    try{ localStorage.setItem(KEY,id); }catch(e){}
+    try{ window.scrollTo({top:0, behavior:"instant"}); }catch(e){ window.scrollTo(0,0); }
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    // Paneller yoksa sessizce çık
+    const any = PANELS.some(id=>document.getElementById(id));
+    if(!any) return;
+
+    // nav event bağla
+    document.querySelectorAll(".navBtn").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id=btn.getAttribute("data-v291");
+        show(id);
+      });
+    });
+
+    // son seçim
+    let last="cardProducts";
+    try{ last=localStorage.getItem(KEY) || "cardProducts"; }catch(e){}
+    if(!document.getElementById(last)) last="cardProducts";
+    show(last);
+  });
+})();
+
 </script>
+
+  <!-- V291: Gemini tarzı hafif alt sekme -->
+  <nav class="bottomNav" id="bottomNav">
+    <div class="navRow">
+      <button class="navBtn navBtnOn" data-v291="cardProducts" type="button">Özet</button>
+      <button class="navBtn" data-v291="cardOps" type="button">İşlem</button>
+      <button class="navBtn" data-v291="cardAlarm" type="button">Alarm</button>
+      <button class="navBtn" data-v291="cardReport" type="button">Rapor</button>
+    </div>
+  </nav>
+
 </body>
 </html>
