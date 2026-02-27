@@ -452,6 +452,21 @@ body.compact .pill{padding:8px 10px}
 }
 .opsFilterBar .name{font-weight:950}
 
+
+/* V28_ALARM_TAB */
+.alarmRow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.alarmBtn{padding:10px 12px;border-radius:999px}
+.alarmBtnOn{background:rgba(239,68,68,.16);border-color:rgba(239,68,68,.35)}
+.alarmKpi{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.alarmKpi .pill{justify-content:center;font-weight:950}
+.alarmList{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.alarmItem{padding:12px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.03)}
+.alarmTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.alarmName{font-weight:950}
+.alarmMeta{color:var(--muted);font-size:12px;margin-top:6px}
+.badgeRed{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid rgba(239,68,68,.45);background:rgba(239,68,68,.14);color:#fecaca;font-size:12px;font-weight:900}
+.badgeWarn{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.12);color:#fde68a;font-size:12px;font-weight:900}
+
 </style>
 </head>
 <body>
@@ -723,6 +738,7 @@ body.compact .pill{padding:8px 10px}
 /* V25_STOCK_COLOR_SPEED_V2 */
 /* V26_TABS_DECLUTTER */
 /* V27_DECLUTTER_PRODUCTS_MOVE_HISTORY */
+/* V28_ALARM_TAB */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -2637,6 +2653,142 @@ computeForecast = function(){
     }
   }, 120);
 })();
+
+
+/* V28_ALARM_TAB */
+let ALARM_DAYS = 7;
+
+function opsWindow(db, days){
+  const now = Date.now();
+  const from = now - days*24*3600*1000;
+  return (db.ops||[]).filter(o => (o.ts||0) >= from);
+}
+
+function calcCritical(db, pid, days){
+  const net = (typeof computeStock === "function") ? computeStock(db, pid) : 0;
+  const ops = opsWindow(db, days).filter(o=>o.pid===pid);
+
+  // eksi akış (satış+iade+skt) toplami
+  let out = 0;
+  for(const o of ops){
+    const q = Number(o.qty||0);
+    if(!q) continue;
+    if(o.dir==="-" && (o.type==="satis" || o.type==="iade" || o.type==="skt")){
+      out += q;
+    }
+  }
+
+  const avgDaily = out / Math.max(1, days);
+  const daysLeft = (avgDaily>0) ? (net / avgDaily) : Infinity;
+
+  let level="ok";
+  if(net < 0) level="red";
+  else if(net === 0 && avgDaily>0) level="red";
+  else if(daysLeft <= 3) level="red";
+  else if(daysLeft <= 7) level="warn";
+
+  return {net, out, avgDaily, daysLeft, level};
+}
+
+function badgeHTML(m){
+  if(!m) return "";
+  if(m.level==="red"){
+    const d = isFinite(m.daysLeft) ? Math.max(0, Math.round(m.daysLeft)) : null;
+    return `<span class="badgeRed">🟥 Kritik${d!==null?(" • ~"+d+"g"):""}</span>`;
+  }
+  if(m.level==="warn"){
+    const d = isFinite(m.daysLeft) ? Math.max(0, Math.round(m.daysLeft)) : null;
+    return `<span class="badgeWarn">🟧 Uyarı${d!==null?(" • ~"+d+"g"):""}</span>`;
+  }
+  return "";
+}
+
+function renderAlarm(){
+  const db = loadDB();
+  const list = document.getElementById("alarmList");
+  if(!list) return;
+
+  const metas = [];
+  let neg=0, zero=0;
+
+  for(const p of (db.products||[])){
+    const m = calcCritical(db, p.id, ALARM_DAYS);
+    if(m.net < 0) neg++;
+    if(m.net === 0) zero++;
+    if(m.level !== "ok"){
+      metas.push({pid:p.id, name:p.name||"", m});
+    }
+  }
+
+  metas.sort((a,b)=>{
+    const rank = x => (x.m.level==="red"?0:1);
+    const ra=rank(a), rb=rank(b);
+    if(ra!==rb) return ra-rb;
+
+    const da = isFinite(a.m.daysLeft)?a.m.daysLeft:1e18;
+    const dbb= isFinite(b.m.daysLeft)?b.m.daysLeft:1e18;
+    if(da!==dbb) return da-dbb;
+
+    return (a.name||"").localeCompare((b.name||""),"tr");
+  });
+
+  const critCount = metas.length;
+  const aCritCount = document.getElementById("aCritCount");
+  const aNegCount  = document.getElementById("aNegCount");
+  const aZeroCount = document.getElementById("aZeroCount");
+  if(aCritCount) aCritCount.textContent = String(critCount);
+  if(aNegCount)  aNegCount.textContent  = String(neg);
+  if(aZeroCount) aZeroCount.textContent = String(zero);
+
+  if(!critCount){
+    list.innerHTML = `<div class="alarmItem"><div class="hint">Kritik ürün yok. (Bu iyi haber.)</div></div>`;
+    return;
+  }
+
+  list.innerHTML = metas.slice(0, 60).map(x=>{
+    const m=x.m;
+    const d = isFinite(m.daysLeft) ? Math.max(0, Math.round(m.daysLeft)) : null;
+    const speed = (m.avgDaily>0) ? m.avgDaily.toFixed(1) : "0";
+    return `
+      <div class="alarmItem">
+        <div class="alarmTop">
+          <div style="flex:1">
+            <div class="alarmName">${escapeHTML(x.name)}</div>
+            <div class="alarmMeta">Net: <b>${m.net}</b> • ${ALARM_DAYS}g eksi akış: <b>${m.out}</b> • gün/çıkış: <b>${speed}</b>${d!==null?(" • ~"+d+"g"): ""}</div>
+          </div>
+          <div>${badgeHTML(m)}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function setAlarmDays(days){
+  ALARM_DAYS = days;
+  const b7 = document.getElementById("btnAlarm7");
+  const b30= document.getElementById("btnAlarm30");
+  if(b7 && b30){
+    if(days===7){ b7.classList.add("alarmBtnOn"); b30.classList.remove("alarmBtnOn"); }
+    else { b30.classList.add("alarmBtnOn"); b7.classList.remove("alarmBtnOn"); }
+  }
+  renderAlarm();
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  const b7 = document.getElementById("btnAlarm7");
+  const b30= document.getElementById("btnAlarm30");
+  if(b7) b7.onclick = ()=> setAlarmDays(7);
+  if(b30) b30.onclick = ()=> setAlarmDays(30);
+
+  // Tab sistemi varsa alarm tabına girince render et
+  const alarmTabBtn = document.querySelector('[data-tab="alarm"]');
+  if(alarmTabBtn){
+    alarmTabBtn.addEventListener("click", ()=>{ try{ renderAlarm(); }catch(e){} });
+  }
+
+  // İlk kurulum
+  try{ setAlarmDays(7); }catch(e){}
+});
 
 </script>
 </body>
