@@ -187,6 +187,7 @@ function renderHQSales(db, ops, days){
       <div class="rRow">
         <div class="rKey">${escapeHTML(k)}</div>
         <div class="badge"><b>${fmtInt(v)}</b></div>
+          ${speedHTMLLight(__crit[p.id])}
       </div>
     </div>
   `).join("") : `<div class="miniLine"><div class="hint">Satış alt kırılım yok.</div></div>`;
@@ -390,6 +391,13 @@ body.compact .pill{padding:8px 10px}
   cursor:pointer;
   font-weight:800;
 }
+
+
+/* V25_STOCK_COLOR_SPEED_V2 */
+.stockGreen{ color:#22c55e; font-weight:1000; }
+.stockWarn{ color:#f59e0b; font-weight:1000; }
+.stockRed{ color:#ef4444; font-weight:1000; }
+.miniSpeed{ font-size:12px; margin-top:6px; opacity:.9; color:var(--muted); }
 
 </style>
 </head>
@@ -621,6 +629,7 @@ body.compact .pill{padding:8px 10px}
 /* V21_RISK_ENGINE */
 /* V22_UI_DECLUTTER */
 /* V24_COMPACT_MODE */
+/* V25_STOCK_COLOR_SPEED_V2 */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -921,6 +930,48 @@ function toggleCompact(){
 document.addEventListener("DOMContentLoaded", ()=>{
   applyCompact();
 });
+
+/* V25_STOCK_COLOR_SPEED_V2 */
+function computeLightCrit(db, pid){
+  const net = computeStock(db, pid);
+
+  // son 7 gün eksi akış: satis+iade+skt
+  const ops7 = (db.ops||[]).filter(o=>{
+    if(o.pid!==pid) return false;
+    const t = new Date(o.ts||0).getTime();
+    return t >= (Date.now() - 7*24*3600*1000);
+  });
+
+  let out7=0;
+  for(const o of ops7){
+    const q=Number(o.qty||0);
+    if(!q) continue;
+    if(o.dir==="-" && (o.type==="satis" || o.type==="iade" || o.type==="skt")) out7 += q;
+  }
+
+  const avg = out7/7;
+  const daysLeft = (avg>0) ? (net/avg) : Infinity;
+
+  let level="ok";
+  if(net<0) level="red";
+  else if(net===0 && avg>0) level="red";
+  else if(daysLeft<=3) level="red";
+  else if(daysLeft<=7) level="warn";
+
+  return {net, avgDailyOut: avg, daysLeft, level};
+}
+
+function stockClassByLevel(level){
+  if(level==="red") return "stockRed";
+  if(level==="warn") return "stockWarn";
+  return "stockGreen";
+}
+
+function speedHTMLLight(meta){
+  if(!meta) return "";
+  if(!meta.avgDailyOut || meta.avgDailyOut<=0) return "";
+  return '<div class="miniSpeed">Günlük çıkış ort: <b>'+meta.avgDailyOut.toFixed(1)+'</b></div>';
+}
 function renderProducts(){
   const db=loadDB();
   const q=($("inSearch").value||"").trim().toLowerCase();
@@ -937,7 +988,9 @@ function renderProducts(){
     return;
   }
 
+  const __crit = {};
   for(const p of filtered){
+    try{ __crit[p.id]=computeLightCrit(db,p.id); }catch(e){ __crit[p.id]=null; }
     const net = computeStock(db, p.id);
     const el=document.createElement("div");
     el.className="item";
@@ -948,7 +1001,7 @@ function renderProducts(){
           <div class="muted">ID: ${p.id.slice(0,8)} • Son: ${new Date(p.ts||Date.now()).toLocaleString("tr-TR")}</div>
         </div>
         <div class="netBox">
-          <div class="netBig" title="Net Stok">${net}</div>
+          <div class="netBig" title="Net Stok"><span class="${stockClassByLevel((__crit[p.id]&&__crit[p.id].level)||'ok')}">${net}</span></div>
         </div>
       </div>
       <div class="miniRow">
