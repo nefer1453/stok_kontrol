@@ -577,6 +577,17 @@ main{ padding-bottom: 92px !important; }
 
 
 /* V293_TOP_TABS_REMOVED */
+
+/* V292FIX_V291_NAV_VISIBILITY */
+/* v291 panel görünürlüğü kesinle */
+.v291Panel{ display:none !important; }
+.v291PanelOn{ display:block !important; }
+
+/* eski tab/panel mimarisi kalıntıları varsa onları nötrle (v3.x / v30 vb) */
+.panel{ display:block !important; }
+.panelActive{ display:block !important; }
+#tabsBar, .tabsBar, .tabs, .tabRow{ display:none !important; }
+
 </style>
 </head>
 <body>
@@ -867,6 +878,7 @@ main{ padding-bottom: 92px !important; }
 /* V28_ALARM_TAB */
 /* V29_CENTER_KPI_REPORT_FILTER */
 /* V291_MINT_LIGHT_UI */
+/* V292FIX_V291_NAV_VISIBILITY */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -3058,13 +3070,15 @@ document.addEventListener("DOMContentLoaded", ()=>{
 })();
 
 
-/* V292_SINGLE_NAV_CONTROL */
+/* V292_SINGLE_NAV_CONTROL (fixed) */
 document.addEventListener("DOMContentLoaded", function(){
   try{
-    localStorage.setItem("stok_v291_tab","cardProducts");
+    // sadece ilk kurulumda default ata; kullanıcı seçimini ezme
+    if(!localStorage.getItem("stok_v291_tab")){
+      localStorage.setItem("stok_v291_tab","cardProducts");
+    }
   }catch(e){}
 });
-
 </script>
 
   <!-- V291: Gemini tarzı hafif alt sekme -->
