@@ -437,6 +437,21 @@ body.compact .pill{padding:8px 10px}
 }
 .hiddenPanel{ display:none !important; }
 
+
+/* V27_DECLUTTER_PRODUCTS_MOVE_HISTORY */
+.actBar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.actMain{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.actMoreWrap{display:none;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.showMore .actMoreWrap{display:flex}
+.btnGhost{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.08);color:var(--muted)}
+.opsFilterBar{
+  display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+  padding:10px 12px;border:1px solid var(--line);border-radius:18px;
+  background:rgba(255,255,255,.03);
+  margin-bottom:10px;
+}
+.opsFilterBar .name{font-weight:950}
+
 </style>
 </head>
 <body>
@@ -707,6 +722,7 @@ body.compact .pill{padding:8px 10px}
 /* V24_COMPACT_MODE */
 /* V25_STOCK_COLOR_SPEED_V2 */
 /* V26_TABS_DECLUTTER */
+/* V27_DECLUTTER_PRODUCTS_MOVE_HISTORY */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -1081,23 +1097,28 @@ function renderProducts(){
           <div class="netBig" title="Net Stok"><span class="${stockClassByLevel((__crit[p.id]&&__crit[p.id].level)||'ok')}">${net}</span></div>
         </div>
       </div>
-      <div class="miniRow">
-        <span class="tag">Net: <b>${net}</b></span>
-        <button class="btn smallBtn" data-act="qplus" data-pid="${p.id}" type="button">+1</button>
-        <button class="btn smallBtn" data-act="qminus" data-pid="${p.id}" type="button">-1</button>
-        <button class="btn smallBtn btnOK" data-act="plus" data-pid="${p.id}" type="button">+ İşlem</button>
-        <button class="btn smallBtn btnBAD" data-act="minus" data-pid="${p.id}" type="button">- İşlem</button>
-        
-        <!-- V14 fast ops -->
-        <button class="btn smallBtn btnOK" data-act="aPlus1" data-pid="${p.id}" type="button">+1</button>
-        <button class="btn smallBtn btnBAD" data-act="aMinus1" data-pid="${p.id}" type="button">-1</button>
-        ${p.packDefault ? `
-          <button class="btn smallBtn btnOK" data-act="kPlus1" data-pid="${p.id}" type="button">+1 koli</button>
-          <button class="btn smallBtn btnBAD" data-act="kMinus1" data-pid="${p.id}" type="button">-1 koli</button>
-          <span class="tag">koli içi: <b>${p.packDefault}</b></span>
-        ` : ``}
-<button class="btn smallBtn" data-act="hist" data-pid="${p.id}" type="button">Geçmiş</button>
+      <div class="actBar" id="act_${p.id}">
+        <div class="actMain">
+          <button class="btn smallBtn btnOK" data-act="plus" data-pid="${p.id}" type="button">+ İşlem</button>
+          <button class="btn smallBtn btnBAD" data-act="minus" data-pid="${p.id}" type="button">- İşlem</button>
+          <button class="btn smallBtn" data-act="ops" data-pid="${p.id}" type="button">İşlemler</button>
+          <button class="btn smallBtn btnGhost" data-act="more" data-pid="${p.id}" type="button">⋯</button>
+        </div>
+
+        <!-- Gizli hızlı tuşlar (kalabalığı bitir) -->
+        <div class="actMoreWrap" id="more_${p.id}">
+          <button class="btn smallBtn btnOK" data-act="qplus" data-pid="${p.id}" type="button">+1</button>
+          <button class="btn smallBtn btnBAD" data-act="qminus" data-pid="${p.id}" type="button">-1</button>
+
+          ${p.packDefault ? `
+            <button class="btn smallBtn btnOK" data-act="kPlus1" data-pid="${p.id}" type="button">+1 koli</button>
+            <button class="btn smallBtn btnBAD" data-act="kMinus1" data-pid="${p.id}" type="button">-1 koli</button>
+            <span class="tag">koli içi: <b>${p.packDefault}</b></span>
+          ` : ``}
+        </div>
       </div>
+
+      <!-- V27: History artık Ürün kartında gösterilmeyecek (Ops sekmesine taşındı) -->
       <div class="list" id="hist_${p.id}" style="display:none;margin-top:10px"></div>
     `;
     list.appendChild(el);
@@ -1108,7 +1129,20 @@ function renderProducts(){
     btn.addEventListener("click", ()=>{
       const act=btn.getAttribute("data-act");
       const pid=btn.getAttribute("data-pid");
-      if(act==="hist"){ toggleHistory(pid); return; }
+      // V27: geçmiş Ops sekmesine taşındı
+        if(act==="ops"){
+          try{ window.__OPS_FILTER_PID = pid; }catch(e){}
+          // Ops sekmesine tıkla
+          const b = document.querySelector('#tabsBar .tabBtn[data-tab="ops"]');
+          if(b) b.click();
+          try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+          return;
+        }
+        if(act==="more"){
+          const wrap = document.getElementById("act_"+pid);
+          if(wrap) wrap.classList.toggle("showMore");
+          return;
+        }
       if(act==="qplus"){ quickOp(pid, "+", 1); return; }
       if(act==="qminus"){ quickOp(pid, "-", 1); return; }
       
@@ -2505,6 +2539,103 @@ computeForecast = function(){
     // ops panel ilk çizim
     try{ renderOpsPanel(); }catch(e){}
   });
+})();
+
+
+/* V27_DECLUTTER_PRODUCTS_MOVE_HISTORY */
+(function(){
+  // Ops paneline filtre barı ekle (yoksa)
+  function ensureOpsFilterBar(){
+    const card = document.getElementById("cardOps");
+    if(!card) return;
+    if(document.getElementById("opsFilterBar")) return;
+
+    const bar = document.createElement("div");
+    bar.className = "opsFilterBar";
+    bar.id = "opsFilterBar";
+    bar.style.display = "none";
+    bar.innerHTML = `
+      <span class="tag">Filtre</span>
+      <span class="name" id="opsFilterName"></span>
+      <button class="btn smallBtn" id="btnOpsFilterClear" type="button">Temizle</button>
+    `;
+
+    // card içindeki ilk hr'den önce koyalım
+    const hr = card.querySelector(".hr");
+    if(hr) hr.parentNode.insertBefore(bar, hr);
+    else card.insertBefore(bar, card.firstChild);
+
+    const clr = document.getElementById("btnOpsFilterClear");
+    if(clr){
+      clr.onclick = ()=>{
+        window.__OPS_FILTER_PID = null;
+        try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+      };
+    }
+  }
+
+  function prodNameById(pid){
+    try{
+      const db = (typeof loadDB==="function") ? loadDB() : null;
+      if(!db || !db.products) return pid ? pid.slice(0,8) : "";
+      const p = db.products.find(x=>x.id===pid);
+      return p ? p.name : (pid ? pid.slice(0,8) : "");
+    }catch(e){
+      return pid ? pid.slice(0,8) : "";
+    }
+  }
+
+  // renderOpsPanel wrapper: filtre uygula
+  function wrapOpsRenderer(){
+    if(typeof window.renderOpsPanel !== "function") return;
+    if(window.__V27_WRAPPED_OPS) return;
+
+    const orig = window.renderOpsPanel;
+    window.renderOpsPanel = function(){
+      ensureOpsFilterBar();
+
+      const pid = window.__OPS_FILTER_PID || null;
+      const bar = document.getElementById("opsFilterBar");
+      const nm  = document.getElementById("opsFilterName");
+
+      // orig render etsin, ama biz önce db.ops'yi geçici filtreleyelim
+      // En güvenlisi: orig içinde loadDB() çağrıldığı için, burada geçici olarak loadDB wrapper yapıyoruz.
+      if(pid && typeof loadDB==="function"){
+        const _load = loadDB;
+        window.loadDB = function(){
+          const db = _load();
+          db.ops = (db.ops||[]).filter(o=>o.pid===pid);
+          return db;
+        };
+        try{ orig(); } finally { window.loadDB = _load; }
+      }else{
+        orig();
+      }
+
+      if(pid){
+        if(bar) bar.style.display = "";
+        if(nm) nm.textContent = prodNameById(pid);
+      }else{
+        if(bar) bar.style.display = "none";
+        if(nm) nm.textContent = "";
+      }
+    };
+
+    window.__V27_WRAPPED_OPS = true;
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    try{ ensureOpsFilterBar(); }catch(e){}
+    try{ wrapOpsRenderer(); }catch(e){}
+  });
+
+  // Eğer sonradan renderOpsPanel tanımlandıysa da sar:
+  const t = setInterval(()=>{
+    if(typeof window.renderOpsPanel === "function"){
+      try{ wrapOpsRenderer(); }catch(e){}
+      clearInterval(t);
+    }
+  }, 120);
 })();
 
 </script>
