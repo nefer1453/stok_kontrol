@@ -3146,9 +3146,18 @@ document.addEventListener("DOMContentLoaded", function(){
 (function(){
   const KEY = "stok_active_pid_v32";
 
-  window.getActivePid = function(){
-    try{ return localStorage.getItem(KEY) || ""; }catch(e){ return ""; }
-  };
+  /* V34_FIX_GLOBAL_PID */
+
+window.getActivePid = function(){
+  try{
+    const sel = document.getElementById("globalProdSelect");
+    if(sel && sel.value && sel.value!=="all" && sel.value!=="*"){
+      return sel.value;
+    }
+  }catch(e){}
+  return "";
+};
+
 
   window.setActivePid = function(pid){
     try{
