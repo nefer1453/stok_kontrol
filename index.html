@@ -291,6 +291,7 @@ const _reportForDays_V17 = reportForDays;
 reportForDays = function(days){
   _reportForDays_V17(days);
   const db = loadDB();
+  try{ const __PID=(typeof getActivePid==='function')?getActivePid():''; if(__PID) db.ops=(db.ops||[]).filter(o=>o.pid===__PID); }catch(e){}
   const ops = opsInDays(db, days);
   renderHQSales(db, ops, days);
   renderHQInsert(db, ops, days);
@@ -588,6 +589,33 @@ main{ padding-bottom: 92px !important; }
 .panelActive{ display:block !important; }
 #tabsBar, .tabsBar, .tabs, .tabRow{ display:none !important; }
 
+
+/* V32_GLOBAL_ACTIVE_PRODUCT */
+.globalProdBar{
+  position: sticky;
+  top: 0;
+  z-index: 120;
+  margin: 10px 0 14px;
+  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(11,18,32,.78);
+  backdrop-filter: blur(8px);
+}
+.globalProdBar .row{ gap:8px; flex-wrap:wrap; }
+.globalProdBar select{
+  flex: 1;
+  min-width: 180px;
+}
+.globalTag{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 10px; border-radius:999px;
+  border:1px solid rgba(37,99,235,.35);
+  background:rgba(37,99,235,.14);
+  color: #c7d2fe;
+  font-size:12px; font-weight:950;
+}
+
 </style>
 </head>
 <body>
@@ -614,6 +642,18 @@ main{ padding-bottom: 92px !important; }
 </header>
 
 <main class="wrap">
+  <!-- V32: Global aktif ürün seçimi -->
+  <div class="globalProdBar" id="globalProdBar">
+    <div class="row">
+      <span class="globalTag">🎯 Aktif Ürün</span>
+      <select id="globalProdSelect"></select>
+      <button class="btn smallBtn" id="btnGlobalProdClear" type="button">Temizle</button>
+    </div>
+    <div class="hint" id="globalProdHint" style="margin-top:8px">
+      İpucu: Ürün seçersen İşlem/Alarm/Rapor otomatik o ürüne göre filtrelenir.
+    </div>
+  </div>
+
   <!-- V26: Sekmeli düzen (ekran kalabalığını böl) -->
   <!-- TOP_TABS_REMOVED
 <div class="tabsBar" id="tabsBar">
@@ -890,6 +930,7 @@ main{ padding-bottom: 92px !important; }
 /* V291_MINT_LIGHT_UI */
 /* V292FIX_V291_NAV_VISIBILITY */
 /* B_ALARM_7_15_30_V3 */
+/* V32_GLOBAL_ACTIVE_PRODUCT */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -1026,7 +1067,9 @@ function fillReportFilter(){
   optAll.textContent = "Tümü (genel rapor)";
   sel.appendChild(optAll);
 
-  for(const p of (db.products||[])){
+  const __PID = (typeof getActivePid==="function") ? getActivePid() : "";
+  const __PRODS = __PID ? (db.products||[]).filter(x=>x.id===__PID) : (db.products||[]);
+  for(const p of __PRODS){
     const opt = document.createElement("option");
     opt.value = p.id;
     opt.textContent = (p.name||"Ürün") + "  (id:" + String(p.id||"").slice(0,6) + ")";
@@ -3095,6 +3138,104 @@ document.addEventListener("DOMContentLoaded", function(){
     }
   }catch(e){}
 });
+
+/* V32_GLOBAL_ACTIVE_PRODUCT */
+(function(){
+  const KEY = "stok_active_pid_v32";
+
+  window.getActivePid = function(){
+    try{ return localStorage.getItem(KEY) || ""; }catch(e){ return ""; }
+  };
+
+  window.setActivePid = function(pid){
+    try{
+      if(pid) localStorage.setItem(KEY, pid);
+      else localStorage.removeItem(KEY);
+    }catch(e){}
+  };
+
+  function prodName(db, pid){
+    const p = (db.products||[]).find(x=>x.id===pid);
+    return p ? (p.name||"") : "";
+  }
+
+  window.refreshAllPanels = function(){
+    try{ window.renderProducts && window.renderProducts(); }catch(e){}
+    try{
+      // rapor buton state korunuyorsa zaten kendi çalışır; yine de güncel kalsın:
+      if(window.reportToday) window.reportToday();
+    }catch(e){}
+    try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+    try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+  };
+
+  window.fillGlobalProdSelect = function(){
+    const sel = document.getElementById("globalProdSelect");
+    if(!sel) return;
+
+    const db = (typeof loadDB==="function") ? loadDB() : {products:[], ops:[]};
+    const cur = window.getActivePid();
+
+    const opts = ['<option value="">(Tümü / Ürün seçme)</option>'];
+    for(const p of (db.products||[])){
+      const name = String(p.name||"").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      opts.push('<option value="'+p.id+'">'+name+'</option>');
+    }
+    sel.innerHTML = opts.join("");
+    sel.value = cur;
+
+    const hint = document.getElementById("globalProdHint");
+    if(hint){
+      if(cur){
+        hint.textContent = "Aktif ürün: " + (prodName(db, cur) || cur.slice(0,8)) + " • İşlem/Alarm/Rapor bu ürüne göre çalışıyor.";
+      }else{
+        hint.textContent = "İpucu: Ürün seçersen İşlem/Alarm/Rapor otomatik o ürüne göre filtrelenir.";
+      }
+    }
+
+    // Ops panelinde ayrıca ürün filtresi varsa onu da senkronla (varsa)
+    try{
+      const opsPid = document.getElementById("opsPid");
+      if(opsPid){
+        opsPid.value = cur || "";
+      }
+    }catch(e){}
+  };
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    window.fillGlobalProdSelect();
+
+    const sel = document.getElementById("globalProdSelect");
+    const clr = document.getElementById("btnGlobalProdClear");
+
+    if(sel){
+      sel.addEventListener("change", ()=>{
+        window.setActivePid(sel.value || "");
+        window.fillGlobalProdSelect();
+        window.refreshAllPanels();
+      });
+    }
+    if(clr){
+      clr.addEventListener("click", ()=>{
+        window.setActivePid("");
+        window.fillGlobalProdSelect();
+        window.refreshAllPanels();
+      });
+    }
+  });
+
+  // renderProducts çalışınca select de güncellensin (ürün ekle/sil sonrası)
+  if(typeof window.renderProducts === "function" && !window.__V32_WRAP_RENDERPRODUCTS){
+    const _rp = window.renderProducts;
+    window.renderProducts = function(){
+      const r = _rp.apply(this, arguments);
+      try{ window.fillGlobalProdSelect(); }catch(e){}
+      return r;
+    };
+    window.__V32_WRAP_RENDERPRODUCTS = true;
+  }
+})();
+
 </script>
 
   <!-- V291: Gemini tarzı hafif alt sekme -->
