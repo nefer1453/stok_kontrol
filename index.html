@@ -3288,6 +3288,26 @@ window.getActivePid = function(){
   };
 })();
 
+
+
+/* V4_CORE_STATE */
+window.APP = {
+  activePid: "",
+  db: null
+};
+
+window.getActivePid = function(){
+  return window.APP.activePid || "";
+};
+
+window.setActivePid = function(pid){
+  window.APP.activePid = pid || "";
+  if(typeof renderAll === "function"){
+    renderAll();
+  }
+};
+
+
 </script>
 
   <!-- V291: Gemini tarzı hafif alt sekme -->
