@@ -770,6 +770,16 @@ main{ padding-bottom: 92px !important; }
     <h2>Alarm</h2>
     <div class="hint">Bu ekran “kritik stok / hız / risk” gibi sinyaller için ayrıldı. Şimdilik sade.</div>
     <div class="hr"></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn smallBtn alarmBtnOn" id="btnAlarm7" type="button">7g</button>
+      <button class="btn smallBtn" id="btnAlarm15" type="button">15g</button>
+      <button class="btn smallBtn" id="btnAlarm30" type="button">30g</button>
+      <span class="tag" style="margin-left:auto">Kritik: <b id="aCritCount">0</b> • Neg: <b id="aNegCount">0</b> • Zero: <b id="aZeroCount">0</b></span>
+    </div>
+
+    <div class="hr"></div>
+    <div class="list" id="alarmList"></div>
+
     <div class="item">
       <div class="name">Plan</div>
       <div class="muted">
@@ -879,6 +889,7 @@ main{ padding-bottom: 92px !important; }
 /* V29_CENTER_KPI_REPORT_FILTER */
 /* V291_MINT_LIGHT_UI */
 /* V292FIX_V291_NAV_VISIBILITY */
+/* B_ALARM_7_15_30_V3 */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -2986,19 +2997,24 @@ function renderAlarm(){
 
 function setAlarmDays(days){
   ALARM_DAYS = days;
-  const b7 = document.getElementById("btnAlarm7");
-  const b30= document.getElementById("btnAlarm30");
-  if(b7 && b30){
-    if(days===7){ b7.classList.add("alarmBtnOn"); b30.classList.remove("alarmBtnOn"); }
-    else { b30.classList.add("alarmBtnOn"); b7.classList.remove("alarmBtnOn"); }
-  }
+
+  const b7  = document.getElementById("btnAlarm7");
+  const b15 = document.getElementById("btnAlarm15");
+  const b30 = document.getElementById("btnAlarm30");
+
+  // UI state
+  if(b7)  b7.classList.toggle("alarmBtnOn", days===7);
+  if(b15) b15.classList.toggle("alarmBtnOn", days===15);
+  if(b30) b30.classList.toggle("alarmBtnOn", days===30);
+
   renderAlarm();
 }
 
 document.addEventListener("DOMContentLoaded", ()=>{
   const b7 = document.getElementById("btnAlarm7");
   const b30= document.getElementById("btnAlarm30");
-  if(b7) b7.onclick = ()=> setAlarmDays(7);
+  if(b7) b7.onclick  = ()=> setAlarmDays(7);
+  if(b15) b15.onclick = ()=> setAlarmDays(15);
   if(b30) b30.onclick = ()=> setAlarmDays(30);
 
   // Tab sistemi varsa alarm tabına girince render et
