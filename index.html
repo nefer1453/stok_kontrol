@@ -932,6 +932,7 @@ main{ padding-bottom: 92px !important; }
 /* B_ALARM_7_15_30_V3 */
 /* V32_GLOBAL_ACTIVE_PRODUCT */
 /* V32_REPORT_FILTER_ACTIVE_PRODUCT + FIX_B15 */
+/* V43_SYNC_SELECTS_OPS_FILTER */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -3376,6 +3377,117 @@ window.setActivePid = function(pid){
   document.addEventListener("DOMContentLoaded", ()=>{
     try{ bindSelect(); }catch(e){}
   });
+})();
+
+
+
+/* V43_SYNC_SELECTS_OPS_FILTER */
+(function(){
+  const LSKEY = "stok_active_pid_v4";
+
+  function setPid(pid){
+    pid = pid || "";
+    try{
+      if(window.setActivePid) window.setActivePid(pid);
+      else if(window.APP) window.APP.activePid = pid;
+    }catch(e){}
+
+    // iki select'i de aynı yap
+    try{
+      const g = document.getElementById("globalProdSelect");
+      if(g && g.value !== pid) g.value = pid;
+    }catch(e){}
+
+    try{
+      const r = document.getElementById("reportProdFilter");
+      if(r && r.value !== pid) r.value = pid;
+    }catch(e){}
+
+    // persist
+    try{ localStorage.setItem(LSKEY, pid); }catch(e){}
+
+    // ekranları tazele
+    try{ window.renderProducts && window.renderProducts(); }catch(e){}
+    try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+    try{ window.reportForDays && window.reportForDays((window.REPORT_LAST_DAYS||1)); }catch(e){}
+    try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+  }
+
+  function getPid(){
+    try{ return (window.getActivePid ? window.getActivePid() : (window.APP && window.APP.activePid) || "") || ""; }
+    catch(e){ return ""; }
+  }
+
+  function restore(){
+    let pid = "";
+    try{ pid = localStorage.getItem(LSKEY) || ""; }catch(e){}
+    // select'lerde varsa uygula
+    const g = document.getElementById("globalProdSelect");
+    const r = document.getElementById("reportProdFilter");
+
+    if(g && pid && [...g.options].some(o=>o.value===pid)) g.value = pid;
+    if(r && pid && [...r.options].some(o=>o.value===pid)) r.value = pid;
+
+    // APP'ye yaz
+    if(pid) setPid(pid);
+    else setPid(g ? (g.value||"") : "");
+  }
+
+  function bind(){
+    const g = document.getElementById("globalProdSelect");
+    if(g){
+      g.addEventListener("change", ()=> setPid(g.value||""));
+    }
+
+    const r = document.getElementById("reportProdFilter");
+    if(r){
+      r.addEventListener("change", ()=> setPid(r.value||""));
+    }
+  }
+
+  // Ops panel: aktif ürüne göre ops filtre (tek kaynak: getActivePid)
+  function wrapOps(){
+    if(window.__V43_OPS_WRAPPED) return;
+    if(typeof window.renderOpsPanel !== "function") return;
+
+    const orig = window.renderOpsPanel;
+    window.renderOpsPanel = function(){
+      const pid = getPid();
+      if(pid){
+        const _load = window.loadDB;
+        if(typeof _load === "function"){
+          window.loadDB = function(){
+            const db = _load();
+            db.ops = (db.ops||[]).filter(o=>o && o.pid===pid);
+            return db;
+          };
+          try{ orig(); } finally { window.loadDB = _load; }
+          return;
+        }
+      }
+      orig();
+    };
+    window.__V43_OPS_WRAPPED = true;
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    try{ bind(); }catch(e){}
+    try{ restore(); }catch(e){}
+
+    // renderOpsPanel geç tanımlanıyorsa yakala
+    try{ wrapOps(); }catch(e){}
+    const t = setInterval(()=>{
+      try{
+        if(typeof window.renderOpsPanel === "function"){
+          wrapOps();
+          clearInterval(t);
+        }
+      }catch(e){}
+    }, 120);
+  });
+
+  // dışarıdan da tek satırda setlemek isteyen olursa:
+  window.setActivePidV43 = setPid;
 })();
 
 </script>
