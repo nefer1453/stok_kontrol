@@ -2982,7 +2982,16 @@ function badgeHTML(m){
 
 function renderAlarm(){
   const db = loadDB();
-  const list = document.getElementById("alarmList");
+  
+  /* V4_ALARM_ACTIVE_ONLY */
+  try{
+    const pid = (window.getActivePid? window.getActivePid() : "");
+    if(pid){
+      const only = (db.products||[]).filter(p=>p && p.id===pid);
+      db.products = only;
+    }
+  }catch(e){}
+const list = document.getElementById("alarmList");
   if(!list) return;
 
   const metas = [];
@@ -3307,6 +3316,67 @@ window.setActivePid = function(pid){
   }
 };
 
+
+
+
+/* V4_STAGE2_BIND_ACTIVE */
+(function(){
+  const LSKEY = "stok_active_pid_v4";
+
+  // V32 gibi “select arayıp bulayım” yok. Tek kaynak: APP.activePid
+  window.getActivePid = function(){
+    try{ return (window.APP && window.APP.activePid) ? String(window.APP.activePid||"") : ""; }
+    catch(e){ return ""; }
+  };
+
+  // reportForDays zaten bunu çağırıyor → burayı sağlam yapıyoruz
+  window.applyActivePidFilter = function(db){
+    try{
+      const pid = window.getActivePid ? window.getActivePid() : "";
+      if(!pid) return db;
+      const nd = Object.assign({}, db);
+      nd.ops = (db.ops||[]).filter(o => o && o.pid === pid);
+      return nd;
+    }catch(e){
+      return db;
+    }
+  };
+
+  function save(pid){
+    try{ localStorage.setItem(LSKEY, pid||""); }catch(e){}
+  }
+  function load(){
+    try{ return localStorage.getItem(LSKEY)||""; }catch(e){ return ""; }
+  }
+
+  function bindSelect(){
+    const sel = document.getElementById("globalProdSelect");
+    if(!sel) return;
+
+    // restore (varsa)
+    const want = load();
+    if(want && [...sel.options].some(o=>o.value===want)){
+      sel.value = want;
+      if(window.setActivePid) window.setActivePid(want);
+      else if(window.APP) window.APP.activePid = want;
+    } else {
+      // boşsa “tümü”
+      if(window.setActivePid) window.setActivePid(sel.value||"");
+      else if(window.APP) window.APP.activePid = (sel.value||"");
+    }
+
+    sel.addEventListener("change", ()=>{
+      const pid = sel.value || "";
+      if(window.setActivePid) window.setActivePid(pid);
+      else if(window.APP) window.APP.activePid = pid;
+      save(pid);
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    try{ bindSelect(); }catch(e){}
+  });
+})();
 
 </script>
 
