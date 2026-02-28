@@ -931,6 +931,7 @@ main{ padding-bottom: 92px !important; }
 /* V292FIX_V291_NAV_VISIBILITY */
 /* B_ALARM_7_15_30_V3 */
 /* V32_GLOBAL_ACTIVE_PRODUCT */
+/* V32_REPORT_FILTER_ACTIVE_PRODUCT + FIX_B15 */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -1899,7 +1900,8 @@ function opsInDays(db, days){
   });
 }
 function reportForDays(days){
-  const db=loadDB();
+  let db = loadDB();
+  if(window.applyActivePidFilter) db = window.applyActivePidFilter(db);
   let ops=opsInDays(db, days);
   // V29: ürün filtresi
   if(typeof REPORT_PID==='string' && REPORT_PID){ ops = ops.filter(o=>o.pid===REPORT_PID); }
@@ -3235,6 +3237,46 @@ document.addEventListener("DOMContentLoaded", function(){
     };
     window.__V32_WRAP_RENDERPRODUCTS = true;
   }
+})();
+
+
+/* V32_REPORT_FILTER_ACTIVE_PRODUCT */
+(function(){
+  // aktif ürün id'sini olabildiğince güvenli yakala
+  window.getActivePid = function(){
+    try{
+      if(window.ACTIVE_PID) return String(window.ACTIVE_PID||"");
+      // LocalStorage ihtimalleri
+      const keys = ["stok_active_pid","stok_kontrol_active_pid","stok_focus_pid","active_pid"];
+      for(const k of keys){
+        const v = localStorage.getItem(k);
+        if(v && v!=="all" && v!=="*") return v;
+      }
+      // DOM ihtimalleri (id denemeleri)
+      const ids = ["activeProd","activeProdSel","selActiveProd","activeProduct","focusProd","prodFocus","selFocusProd"];
+      for(const id of ids){
+        const el = document.getElementById(id);
+        if(el && el.value && el.value!=="all" && el.value!=="*") return el.value;
+      }
+      // son çare: select içinde “Ürün seçme” barına yakın olan ilk select
+      const sel = document.querySelector('select');
+      if(sel && sel.value && sel.value!=="all" && sel.value!=="*") return sel.value;
+    }catch(e){}
+    return "";
+  };
+
+  window.applyActivePidFilter = function(db){
+    try{
+      const pid = window.getActivePid ? window.getActivePid() : "";
+      if(!pid) return db;
+      const ops = (db.ops||[]).filter(o => o && o.pid === pid);
+      const nd = Object.assign({}, db);
+      nd.ops = ops;
+      return nd;
+    }catch(e){
+      return db;
+    }
+  };
 })();
 
 </script>
