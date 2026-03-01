@@ -1081,6 +1081,7 @@ try{
 /* V56_OPS_VIRTUAL_RENDER */
 /* V58_ACTIVE_PRODUCT_DRIVES_ALL */
 /* V59_FOCUS_TOGGLE_CLEAR_ACTIVE */
+/* V61_OPS_GLOBAL_SYNC */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -4844,6 +4845,52 @@ head.innerHTML = '<div class="opsMiniRow">'+
     // açılışta state uygula
     applyFocusRule();
   });
+})();
+
+
+/* V61_OPS_GLOBAL_SYNC */
+(function(){
+
+  function syncFromOpsFilter(){
+    try{
+      const pid = (typeof window!=="undefined" && window.__OPS_FILTER_PID)
+                  ? String(window.__OPS_FILTER_PID||"")
+                  : "";
+
+      // Global select senkron
+      const sel = document.getElementById("globalProdSelect");
+      if(sel){
+        try{ sel.value = pid || ""; }catch(e){}
+      }
+
+      // Global state
+      try{ window.ACTIVE_PID = pid || ""; }catch(e){}
+      try{ window.REPORT_PID = pid || ""; }catch(e){}
+
+      // Tüm panelleri tazele
+      try{ window.renderProducts && window.renderProducts(); }catch(e){}
+      try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+      try{ window.reportToday && window.reportToday(); }catch(e){}
+      try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+
+    }catch(e){}
+  }
+
+  // Ops filtresi değiştiğinde otomatik senkron
+  const origSetter = Object.getOwnPropertyDescriptor(window, "__OPS_FILTER_PID");
+
+  // Eğer descriptor yoksa basit polling fallback
+  if(!origSetter){
+    let last = "";
+    setInterval(()=>{
+      const cur = window.__OPS_FILTER_PID || "";
+      if(cur !== last){
+        last = cur;
+        syncFromOpsFilter();
+      }
+    }, 200);
+  }
+
 })();
 
 </script>
