@@ -1015,6 +1015,14 @@ main{ padding-bottom: 92px !important; }
 /* V49_ACTIVE_PRODUCT_MASTER */
 /* V50_FOCUS_MODE_ACTIVE_PRODUCT */
 /* V51_FOCUS_SYNC_BUGFIX */
+/* V53_STOP_AUTO_REPORT_AND_TAB_REFRESH */
+
+/* V53_STOP_AUTO_REPORT_AND_TAB_REFRESH */
+// Ürün listesi render olurken raporu otomatik tetikleme (donma önleyici)
+try{
+  if(typeof window.__AUTO_REPORT === "undefined") window.__AUTO_REPORT = false;
+}catch(e){}
+
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -1471,7 +1479,7 @@ function renderProducts(){
 if(!filtered.length){
     list.innerHTML = `<div class="item"><div class="hint">Ürün yok / arama sonucu boş.</div></div>`;
     fillProdSelect(); // modal select güncel kalsın
-    reportToday();
+    try{ if(window.__AUTO_REPORT) reportToday(); }catch(e){}
     return;
   }
 
@@ -4367,6 +4375,25 @@ window.setActivePid = function(pid){
     }
   });
 })();
+
+
+/* V53_ACTIVE_PRODUCT_CHANGE_REFRESH */
+document.addEventListener("DOMContentLoaded", ()=>{
+  try{
+    const sel=document.getElementById("globalProdSelect");
+    if(sel && !sel.__v53_bound){
+      sel.__v53_bound = true;
+      sel.addEventListener("change", ()=>{
+        try{
+          // ürün değişti => rapor/alarm/ops (varsa) güncelle
+          try{ reportToday(); }catch(e){}
+          try{ if(typeof renderAlarm==="function") renderAlarm(); }catch(e){}
+          try{ if(typeof window.renderOpsPanel==="function") window.renderOpsPanel(); }catch(e){}
+        }catch(e){}
+      });
+    }
+  }catch(e){}
+});
 
 </script>
 
