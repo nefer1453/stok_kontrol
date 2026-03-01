@@ -1251,6 +1251,31 @@ try{
 /* V70_OPS_RANGE_FILTER */
 /* V70C_OPS_CLEANUP_DUPLICATES */
 /* V71_OPS_KPI_RANGE_BRACE */
+
+/* V71D_FIX_TOGGLECOMPACT_POLYFILL */
+(function(){
+  try{
+    // Kompakt toggle bazı sürümlerde isim değişti/eksik kaldı -> RefError donma yapıyor.
+    if(typeof window.toggleCompact !== "function"){
+      window.toggleCompact = function(){
+        try{
+          window.__UI_COMPACT = !window.__UI_COMPACT;
+
+          // mümkünse kalıcı tut
+          try{ localStorage.setItem("__ui_compact", window.__UI_COMPACT ? "1" : "0"); }catch(e){}
+
+          // varsa yeniden çiz
+          try{ window.render && window.render(); }catch(e){}
+          try{ window.renderProducts && window.renderProducts(); }catch(e){}
+          try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+          try{ window.reportToday && window.reportToday(); }catch(e){}
+          try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+        }catch(e){}
+      };
+    }
+  }catch(e){}
+})();
+
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
