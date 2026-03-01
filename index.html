@@ -790,6 +790,37 @@ main{ padding-bottom: 92px !important; }
   margin-top:4px;
 }
 
+
+/* V67_ACTIVE_TOAST */
+#v67Toast{
+  position: fixed;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  z-index: 99999;
+  max-width: min(92vw, 520px);
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: .1px;
+  color: rgba(255,255,255,.92);
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+#v67Toast.on{
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+#v67Toast small{
+  font-weight: 700;
+  opacity: .9;
+}
+
 </style>
 </head>
 <body>
@@ -1135,6 +1166,7 @@ try{
 /* V64B_OPS_CHIP_CLEAR_PACKINFO */
 /* V65_ERROR_GUARD */
 /* V66_ACTIVE_PID_SYNC */
+/* V67_ACTIVE_TOAST */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -5093,6 +5125,65 @@ if(pid){
   }
 
   document.addEventListener("DOMContentLoaded", bindActivePidSync);
+})();
+</script>
+
+
+<!-- V67_ACTIVE_TOAST -->
+<script>
+(function(){
+  let tmr = null;
+
+  function ensureToast(){
+    let el = document.getElementById("v67Toast");
+    if(el) return el;
+    el = document.createElement("div");
+    el.id = "v67Toast";
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function showToast(msg){
+    try{
+      const el = ensureToast();
+      el.innerHTML = msg;
+      el.classList.add("on");
+      if(tmr) clearTimeout(tmr);
+      tmr = setTimeout(()=>{ try{ el.classList.remove("on"); }catch(e){} }, 1500);
+    }catch(e){}
+  }
+
+  function activeNameFromSelect(){
+    const sel = document.getElementById("globalProdSelect");
+    if(!sel) return "";
+    const opt = sel.options && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+    const txt = opt ? (opt.textContent || "").trim() : "";
+    return txt;
+  }
+
+  function bind(){
+    try{
+      const sel = document.getElementById("globalProdSelect");
+      if(!sel) return;
+      if(sel.__v67_bound) return;
+      sel.__v67_bound = true;
+
+      // ilk açılışta da bir kere göster (seçim varsa)
+      try{
+        const n = activeNameFromSelect();
+        if(n) showToast('🎯 Aktif: <small>'+escapeHTML(n)+'</small>');
+      }catch(e){}
+
+      sel.addEventListener("change", ()=>{
+        try{
+          const n = activeNameFromSelect();
+          if(n) showToast('🎯 Aktif: <small>'+escapeHTML(n)+'</small>');
+        }catch(e){}
+      });
+    }catch(e){}
+  }
+
+  document.addEventListener("DOMContentLoaded", bind);
 })();
 </script>
 
