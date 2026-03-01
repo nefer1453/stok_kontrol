@@ -1134,6 +1134,7 @@ try{
 /* V63D_FIX_OPS_PACKCOUNT_IN_RENDEROPSVIRTUAL */
 /* V64B_OPS_CHIP_CLEAR_PACKINFO */
 /* V65_ERROR_GUARD */
+/* V66_ACTIVE_PID_SYNC */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -5053,6 +5054,45 @@ if(pid){
   window.addEventListener("unhandledrejection", function(e){
     showError("Promise Error: " + (e.reason || "unknown"));
   });
+})();
+</script>
+
+
+<!-- V66_ACTIVE_PID_SYNC -->
+<script>
+(function(){
+  function bindActivePidSync(){
+    try{
+      const sel = document.getElementById("globalProdSelect");
+      if(!sel) return;
+      if(sel.__v66_bound) return;
+      sel.__v66_bound = true;
+
+      // sayfa açılınca mevcut seçimi kayda al
+      try{
+        if(sel.value){
+          window.ACTIVE_PID = String(sel.value||"");
+          localStorage.setItem("stok_active_pid", String(sel.value||""));
+        }
+      }catch(e){}
+
+      sel.addEventListener("change", ()=>{
+        try{
+          const v = String(sel.value||"");
+          window.ACTIVE_PID = v;
+          localStorage.setItem("stok_active_pid", v);
+
+          // Panelleri tazele (varsa)
+          try{ window.renderProducts && window.renderProducts(); }catch(e){}
+          try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+          try{ window.reportToday && window.reportToday(); }catch(e){}
+          try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+        }catch(e){}
+      });
+    }catch(e){}
+  }
+
+  document.addEventListener("DOMContentLoaded", bindActivePidSync);
 })();
 </script>
 
