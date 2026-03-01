@@ -742,6 +742,30 @@ main{ padding-bottom: 92px !important; }
   background: rgba(255,255,255,.04);
 }
 
+
+/* V62_OPS_CHIP_PACKINFO */
+.opsFilterChip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  font-size:12px;
+}
+.opsFilterChip b{ color: var(--text); }
+.opsXBtn{
+  padding:6px 10px;
+  border-radius:999px;
+  font-weight:950;
+}
+.opsSubLine{
+  font-size:12px;
+  opacity:.88;
+  margin-top:4px;
+}
+
 </style>
 </head>
 <body>
@@ -1082,6 +1106,7 @@ try{
 /* V58_ACTIVE_PRODUCT_DRIVES_ALL */
 /* V59_FOCUS_TOGGLE_CLEAR_ACTIVE */
 /* V61_OPS_GLOBAL_SYNC */
+/* V62_OPS_CHIP_PACKINFO */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -4610,12 +4635,44 @@ if(pid){
   const pname = prod ? (prod.name||pid.slice(0,8)) : pid.slice(0,8);
   chip = '<span class="opsFilterChip">Filtre: <b>'+esc(pname)+'</b></span>';
 }
-head.innerHTML = '<div class="opsMiniRow">'+
-  '<div class="name">Son İşlemler</div>'+
-  '<div class="opsMiniMeta">'+chip+' Toplam: <b>'+ops.length+'</b></div>'+
-'</div>';
+(function(){
+      const pid = (typeof window!=="undefined" && window.__OPS_FILTER_PID) ? String(window.__OPS_FILTER_PID||"") : "";
+      let chip = "";
+      if(pid){
+        let pname = "";
+        try{
+          const pp = (db.products||[]).find(x=>x.id===pid);
+          pname = pp ? (pp.name||pid.slice(0,8)) : pid.slice(0,8);
+        }catch(e){ pname = pid.slice(0,8); }
+        chip =
+          '<span class="opsFilterChip">Filtre: <b>'+esc(pname)+'</b></span>' +
+          ' <button class="btn opsXBtn btnGhost" id="btnOpsClearFilter" type="button">Kaldır</button>';
+      }
+      head.innerHTML =
+        '<div class="opsMiniRow">'+
+          '<div class="name">Son İşlemler</div>'+
+          '<div class="opsMiniMeta">'+chip+' &nbsp; Toplam: <b>'+ops.length+'</b></div>'+
+        '</div>';
+    })();
 
-    list.appendChild(head);
+    
+      list.appendChild(head);
+
+      // V62: filtre kaldır butonu bağla (varsa)
+      try{
+        const bx = document.getElementById("btnOpsClearFilter");
+        if(bx && !bx.__bound){
+          bx.__bound = true;
+          bx.addEventListener("click", ()=>{
+            try{ window.__OPS_FILTER_PID = ""; }catch(e){}
+            try{ renderOpsVirtual(); }catch(e){}
+            try{ window.renderProducts && window.renderProducts(); }catch(e){}
+            try{ window.reportToday && window.reportToday(); }catch(e){}
+            try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+          });
+        }
+      }catch(e){}
+
 
     let i = 0;
     const total = ops.length;
@@ -4636,6 +4693,14 @@ head.innerHTML = '<div class="opsMiniRow">'+
         const unit = (o.unitMode==="koli" ? "koli" : "adet");
         const sub = (o.sub||"");
         const note = (o.note||"");
+
+          let packInfo = "";
+          if(unit==="koli" && packCount>0 && packSize>0){
+            const total = packCount*packSize;
+            packInfo = `<div class="opsSubLine">Koli: <b>${packCount}</b> × <b>${packSize}</b> = <b>${total}</b> adet</div>`;
+          }else if(unit==="koli" && packCount>0 && packSize<=0){
+            packInfo = `<div class="opsSubLine">Koli: <b>${packCount}</b> (koli içi yok)</div>`;
+          }
 
         const row = document.createElement("div");
         row.className = "item";
