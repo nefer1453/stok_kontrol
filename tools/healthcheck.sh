@@ -13,25 +13,41 @@ else
 fi
 
 echo "[3] renderOpsVirtual içinde çıplak packCount/packSize var mı? (asıl tehlike bu)"
+set +e
 python - <<'PY'
-import re
+import re, sys
 s=open("index.html","r",encoding="utf-8").read()
+
 m=re.search(r'function\s+renderOpsVirtual\s*\(\)\s*\{[\s\S]*?\n\s*\}', s)
 if not m:
     print("renderOpsVirtual yok -> PASS")
-    raise SystemExit(0)
+    sys.exit(0)
+
 block=m.group(0)
 bad=[]
 for mm in re.finditer(r'(?<!\.)\b(packCount|packSize)\b', block):
     ln = block.count("\n", 0, mm.start()) + 1
     bad.append((mm.group(1), ln))
+
 if bad:
     print("RİSK VAR: renderOpsVirtual içinde çıplak değişken bulundu:")
     for k,ln in bad[:30]:
         print(f" - {k} @ renderOpsVirtual:+{ln}")
-    raise SystemExit(2)
+    sys.exit(2)
+
 print("OK: renderOpsVirtual temiz ✅")
-PY || true
+sys.exit(0)
+PY
+rc=$?
+set -e
+
+if [ "$rc" -eq 2 ]; then
+  echo "=> SONUÇ: Ops ekranında donma riski var (RefError)."
+elif [ "$rc" -ne 0 ]; then
+  echo "=> SONUÇ: Healthcheck python kısmı hata verdi (rc=$rc)."
+else
+  echo "=> SONUÇ: renderOpsVirtual temiz, rahatız."
+fi
 
 echo "[4] git durumu"
 git status -sb || true
