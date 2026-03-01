@@ -1276,6 +1276,7 @@ try{
   }catch(e){}
 })();
 
+/* V72_FREEZE_BLACKBOX */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -5537,7 +5538,141 @@ document.addEventListener("DOMContentLoaded", ()=>{
     const observer = new MutationObserver(injectBar);
     observer.observe(document.body, { childList:true, subtree:true });
 
-    injectBar();
+    
+
+/* V72_FREEZE_BLACKBOX */
+(function(){
+  // --- küçük, güvenli logger ---
+  const KEY="stok_debug_log_v72";
+  function nowISO(){
+    try{ return new Date().toISOString(); }catch(e){ return String(Date.now()); }
+  }
+  function pushLog(obj){
+    try{
+      const arr = JSON.parse(localStorage.getItem(KEY)||"[]");
+      arr.push(Object.assign({t: nowISO()}, obj||{}));
+      while(arr.length>60) arr.shift();
+      localStorage.setItem(KEY, JSON.stringify(arr));
+    }catch(e){}
+  }
+  function esc(s){
+    try{
+      return String(s).replace(/[&<>]/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;" }[m]));
+    }catch(e){ return ""; }
+  }
+
+  // --- global errors ---
+  try{
+    window.addEventListener("error", (ev)=>{
+      try{
+        pushLog({
+          kind:"error",
+          msg: String(ev.message||""),
+          src: String(ev.filename||""),
+          line: Number(ev.lineno||0),
+          col: Number(ev.colno||0)
+        });
+      }catch(e){}
+    });
+  }catch(e){}
+
+  try{
+    window.addEventListener("unhandledrejection", (ev)=>{
+      try{
+        const r = ev && ev.reason;
+        pushLog({
+          kind:"rejection",
+          msg: (r && (r.stack||r.message)) ? String(r.stack||r.message) : String(r||"")
+        });
+      }catch(e){}
+    });
+  }catch(e){}
+
+  // --- donma tespiti (main thread stall) ---
+  // 500ms heartbeat: aradaki fark 3000ms üstüyse "stall" logla
+  try{
+    let last = Date.now();
+    setInterval(()=>{
+      const t = Date.now();
+      const dt = t - last;
+      last = t;
+      if(dt > 3000){
+        pushLog({kind:"stall", dt: dt});
+      }
+    }, 500);
+  }catch(e){}
+
+  // --- mini debug butonu + popup ---
+  function ensureBtn(){
+    try{
+      if(document.getElementById("btnDebugV72")) return;
+      const b=document.createElement("button");
+      b.id="btnDebugV72";
+      b.type="button";
+      b.textContent="🐞 Debug";
+      b.style.cssText="position:fixed;top:10px;right:10px;z-index:99999;padding:8px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.35);color:#fff;font-weight:800";
+      b.addEventListener("click", ()=>{
+        try{
+          const arr = JSON.parse(localStorage.getItem(KEY)||"[]");
+          const html = arr.slice(-40).map(x=>{
+            const k=esc(x.kind||"");
+            const t=esc(x.t||"");
+            const msg=esc(x.msg||"");
+            const src=esc(x.src||"");
+            const ln=esc(x.line||"");
+            const col=esc(x.col||"");
+            const dt=esc(x.dt||"");
+            return `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.10)">
+              <div style="font-weight:800">${t} • ${k}</div>
+              ${msg?`<div style="opacity:.95">${msg}</div>`:""}
+              ${(src||ln||col)?`<div style="opacity:.7;font-size:12px">${src} ${ln?(":"+ln):""}${col?(":"+col):""}</div>`:""}
+              ${dt?`<div style="opacity:.8;font-size:12px">stall: ${dt}ms</div>`:""}
+            </div>`;
+          }).join("") || "<div>Log yok.</div>";
+
+          const wrap=document.createElement("div");
+          wrap.id="dbgModalV72";
+          wrap.style.cssText="position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:18px";
+          wrap.innerHTML = `
+            <div style="width:min(720px,100%);background:rgba(15,23,42,.96);color:#fff;border-radius:16px;border:1px solid rgba(255,255,255,.12);padding:14px;max-height:85vh;overflow:auto">
+              <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <div style="font-weight:950;font-size:16px">V72 Debug Log</div>
+                <div style="display:flex;gap:8px">
+                  <button id="dbgClearV72" type="button" style="padding:8px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;font-weight:900">Temizle</button>
+                  <button id="dbgCloseV72" type="button" style="padding:8px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;font-weight:900">Kapat</button>
+                </div>
+              </div>
+              <div style="opacity:.75;font-size:12px;margin-bottom:10px">Donma olunca sayfayı yenile, sonra buradan loga bak.</div>
+              <div>${html}</div>
+            </div>
+          `;
+          document.body.appendChild(wrap);
+
+          document.getElementById("dbgCloseV72").onclick=()=>{ try{ wrap.remove(); }catch(e){} };
+          document.getElementById("dbgClearV72").onclick=()=>{
+            try{ localStorage.removeItem(KEY); }catch(e){}
+            try{ wrap.remove(); }catch(e){}
+            alert("Log temizlendi.");
+          };
+          wrap.addEventListener("click",(e)=>{ if(e.target===wrap){ try{ wrap.remove(); }catch(_){} }});
+        }catch(e){
+          alert("Log açılamadı: "+String(e&&e.message||e));
+        }
+      });
+      document.body.appendChild(b);
+    }catch(e){}
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    pushLog({kind:"boot", msg:"app loaded"});
+    ensureBtn();
+  });
+
+  // bazı ekranlarda body geç yükleniyor olabilir: 1 kez daha dene
+  try{ setTimeout(ensureBtn, 800); }catch(e){}
+})();
+
+injectBar();
   });
 
 })();
