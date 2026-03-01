@@ -624,6 +624,32 @@ main{ padding-bottom: 92px !important; }
 }
 .alarmBar .hint{margin:0}
 
+
+/* V47_ACTIVE_BADGE_AND_ALARM_FOLLOW */
+.activeBadge{
+  margin-top:8px;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px;
+  border-radius:999px;
+  border:1px solid rgba(16,185,129,.35);
+  background: rgba(16,185,129,.10);
+  color: var(--text);
+  font-weight: 950;
+  font-size: 12px;
+}
+.activeBadge .mut{ color: var(--muted); font-weight: 800; }
+.activeBadge .xBtn{
+  margin-left:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: var(--muted);
+  font-weight: 950;
+}
+
 </style>
 </head>
 <body>
@@ -803,6 +829,7 @@ main{ padding-bottom: 92px !important; }
   <!-- V26: Ops panel -->
   <section class="card hiddenPanel" id="cardOps" style="margin-top:14px">
     <h2>İşlemler</h2>
+    <div class="activeBadge" id="activeBadgeOps" style="display:none"></div>
     <div class="hint">Son işlemler (en yeni üstte). Hızlı kontrol için.</div>
     <div class="hr"></div>
     <div class="row">
@@ -816,6 +843,7 @@ main{ padding-bottom: 92px !important; }
   <!-- V26: Alarm panel -->
   <section class="card hiddenPanel" id="cardAlarm" style="margin-top:14px">
     <h2>Alarm</h2>
+    <div class="activeBadge" id="activeBadgeAlarm" style="display:none"></div>
     <div class="hint">Bu ekran “kritik stok / hız / risk” gibi sinyaller için ayrıldı. Şimdilik sade.</div>
     <div class="hr"></div>
     <div class="row" style="gap:8px;flex-wrap:wrap">
@@ -944,6 +972,7 @@ main{ padding-bottom: 92px !important; }
 /* V44_ALARM_7_15_30 */
 /* V45_ALARM_FOLLOWS_ACTIVE_PRODUCT */
 /* V46_OPS_FOLLOWS_ACTIVE_PRODUCT */
+/* V47_ACTIVE_BADGE_AND_ALARM_FOLLOW */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -3760,6 +3789,202 @@ window.setActivePid = function(pid){
   });
 
   window.__V46_WRAPPED_OPS = true;
+})();
+
+
+
+/* V47_ACTIVE_BADGE_AND_ALARM_FOLLOW */
+(function(){
+  if(window.__V47_ACTIVE_BADGE) return;
+
+  function getActivePid(){
+    try{
+      const sel = document.getElementById("globalProdSelect");
+      if(sel && sel.value && sel.value!=="all" && sel.value!=="*") return String(sel.value);
+    }catch(e){}
+    try{
+      if(window.getActivePid){
+        const v = window.getActivePid();
+        if(v && v!=="all" && v!=="*") return String(v);
+      }
+    }catch(e){}
+    return "";
+  }
+
+  function getActiveName(pid){
+    try{
+      const db = (typeof loadDB==="function") ? loadDB() : null;
+      if(!db || !db.products) return "";
+      const p = db.products.find(x=>x.id===pid);
+      return p ? (p.name||"") : "";
+    }catch(e){
+      return "";
+    }
+  }
+
+  function clearActive(){
+    try{
+      const sel=document.getElementById("globalProdSelect");
+      if(sel){
+        sel.value = "";
+        try{ sel.dispatchEvent(new Event("change")); }catch(e){}
+      }
+    }catch(e){}
+  }
+
+  function badgeHTML(name){
+    const safe = (name||"").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    return '🎯 <span class="mut">Aktif:</span> <span>'+safe+'</span> <button class="xBtn" id="btnClearActive" type="button">Temizle</button>';
+  }
+
+  window.updateActiveBadges = function(){
+    const pid = getActivePid();
+    const bOps   = document.getElementById("activeBadgeOps");
+    const bAlarm = document.getElementById("activeBadgeAlarm");
+    const bRep   = document.getElementById("activeBadgeReport");
+
+    if(!pid){
+      if(bOps) bOps.style.display="none";
+      if(bAlarm) bAlarm.style.display="none";
+      if(bRep) bRep.style.display="none";
+      return;
+    }
+
+    const name = getActiveName(pid) || ("ID:"+pid.slice(0,8));
+    const html = badgeHTML(name);
+
+    if(bOps){ bOps.innerHTML = html; bOps.style.display="inline-flex"; }
+    if(bAlarm){ bAlarm.innerHTML = html; bAlarm.style.display="inline-flex"; }
+    if(bRep){ bRep.innerHTML = html; bRep.style.display="inline-flex"; }
+
+    // temizle butonu (aynı id 3 yerde var => en son basılan çalışır; event delegation kullanalım)
+  };
+
+  // Alarm: aktif ürün varsa sadece o ürünü hesapla
+  function wrapAlarm(){
+    if(window.__V47_ALARM_WRAPPED) return;
+    if(typeof window.renderAlarm !== "function") return;
+
+    const orig = window.renderAlarm;
+
+    window.renderAlarm = function(){
+      const pid = getActivePid();
+      if(!pid){
+        try{ orig(); }catch(e){}
+        return;
+      }
+
+      const _load = window.loadDB;
+      if(typeof _load === "function"){
+        window.loadDB = function(){
+          const db = _load();
+          try{
+            db.ops = (db.ops||[]).filter(o => o && o.pid === pid);
+            db.products = (db.products||[]).filter(p => p && p.id === pid);
+          }catch(e){}
+          return db;
+        };
+      }
+
+      try{
+        orig();
+      } finally {
+        if(typeof _load === "function") window.loadDB = _load;
+      }
+    };
+
+    window.__V47_ALARM_WRAPPED = true;
+  }
+
+  function safeReportRefresh(){
+    try{
+      if(typeof window.reportForDays === "function"){
+        // mümkünse son seçili gün aralığına bas
+        let d = 1;
+        try{
+          if(document.getElementById("btnReport30") && document.getElementById("btnReport30").classList.contains("alarmBtnOn")) d=30;
+          else if(document.getElementById("btnReport7") && document.getElementById("btnReport7").classList.contains("alarmBtnOn")) d=7;
+          else if(document.getElementById("btnReport1") && document.getElementById("btnReport1").classList.contains("alarmBtnOn")) d=1;
+        }catch(e){}
+        window.reportForDays(d);
+      }
+    }catch(e){}
+  }
+
+  function safeOpsRefresh(){
+    try{ if(typeof window.renderOpsPanel==="function") window.renderOpsPanel(); }catch(e){}
+  }
+
+  document.addEventListener("click", (ev)=>{
+    const t = ev.target;
+    if(t && t.id==="btnClearActive"){
+      ev.preventDefault();
+      clearActive();
+    }
+  });
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    try{ wrapAlarm(); }catch(e){}
+    try{ window.updateActiveBadges(); }catch(e){}
+
+    // aktif ürün değişince: rozet + alarm + ops + rapor yenile
+    try{
+      const sel=document.getElementById("globalProdSelect");
+      if(sel){
+        sel.addEventListener("change", ()=>{
+          try{ window.updateActiveBadges(); }catch(e){}
+          try{ wrapAlarm(); }catch(e){}
+          try{ safeOpsRefresh(); }catch(e){}
+          try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+          try{ safeReportRefresh(); }catch(e){}
+        });
+      }
+    }catch(e){}
+
+    // Alarm sekmesine girince garanti render + rozet
+    try{
+      const navAlarm = document.querySelector('[data-v291="cardAlarm"]');
+      if(navAlarm){
+        navAlarm.addEventListener("click", ()=>{
+          try{ wrapAlarm(); }catch(e){}
+          try{ window.updateActiveBadges(); }catch(e){}
+          setTimeout(()=>{ try{ window.renderAlarm && window.renderAlarm(); }catch(e){} }, 0);
+        });
+      }
+    }catch(e){}
+
+    // Rapor sekmesine girince: filtreli raporu bas
+    try{
+      const navRep = document.querySelector('[data-v291="cardReport"]');
+      if(navRep){
+        navRep.addEventListener("click", ()=>{
+          try{ window.updateActiveBadges(); }catch(e){}
+          setTimeout(()=>{ try{ safeReportRefresh(); }catch(e){} }, 0);
+        });
+      }
+    }catch(e){}
+
+    // Ops sekmesine girince: rozet + yenile
+    try{
+      const navOps = document.querySelector('[data-v291="cardOps"]');
+      if(navOps){
+        navOps.addEventListener("click", ()=>{
+          try{ window.updateActiveBadges(); }catch(e){}
+          setTimeout(()=>{ try{ safeOpsRefresh(); }catch(e){} }, 0);
+        });
+      }
+    }catch(e){}
+  });
+
+  // renderAlarm sonradan gelirse de sar
+  const t=setInterval(()=>{
+    if(typeof window.renderAlarm==="function"){
+      try{ wrapAlarm(); }catch(e){}
+      clearInterval(t);
+    }
+  }, 120);
+
+  window.__V47_ACTIVE_BADGE = true;
 })();
 
 </script>
