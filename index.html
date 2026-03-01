@@ -860,10 +860,6 @@ main{ padding-bottom: 92px !important; }
 #v68SaveBadge.busy .dot{ opacity: .95; }
 #v68SaveBadge.err .dot{ opacity: .95; }
 
-
-/* V69_OPS_FILTER_CHIP_PERSIST */
-.opsFilterChip small{ opacity:.85; font-weight:800; }
-
 </style>
 </head>
 <body>
@@ -1211,7 +1207,6 @@ try{
 /* V66_ACTIVE_PID_SYNC */
 /* V67_ACTIVE_TOAST */
 /* V68_SAVE_STATUS_BADGE */
-/* V69_OPS_FILTER_CHIP_PERSIST */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -4741,68 +4736,41 @@ if(pid){
   chip = '<span class="opsFilterChip">Filtre: <b>'+esc(pname)+'</b></span>';
 }
 (function(){
-      // V69: ops filtresi (RAM + sessionStorage)
-      let pid = "";
-      try{
-        pid = (typeof window!=="undefined" && window.__OPS_FILTER_PID) ? String(window.__OPS_FILTER_PID||"") : "";
-      }catch(e){ pid=""; }
-
-      if(!pid){
-        try{
-          const sp = sessionStorage.getItem("ops_filter_pid") || "";
-          if(sp) pid = String(sp);
-        }catch(e){}
-      }else{
-        try{ sessionStorage.setItem("ops_filter_pid", pid); }catch(e){}
-      }
-
+      const pid = (typeof window!=="undefined" && window.__OPS_FILTER_PID) ? String(window.__OPS_FILTER_PID||"") : "";
       let chip = "";
       if(pid){
         let pname = "";
-        let sid = "";
         try{
-          sid = pid.slice(0,8);
           const pp = (db.products||[]).find(x=>x.id===pid);
-          pname = pp ? (pp.name||sid) : sid;
-        }catch(e){ pname = pid.slice(0,8); sid = pid.slice(0,8); }
-
-        let activeTag = "";
-        try{
-          const ap = (window.getActivePid ? String(window.getActivePid()||"") : "");
-          if(ap && ap === pid) activeTag = ' <small>(aktif)</small>';
-        }catch(e){}
-
+          pname = pp ? (pp.name||pid.slice(0,8)) : pid.slice(0,8);
+        }catch(e){ pname = pid.slice(0,8); }
         chip =
-          '<span class="opsFilterChip">Filtre: <b>'+esc(pname)+'</b> <small>#'+esc(sid)+'</small>'+activeTag+'</span>' +
+          '<span class="opsFilterChip">Filtre: <b>'+esc(pname)+'</b></span>' +
           ' <button class="btn opsXBtn btnGhost" id="btnOpsClearFilter" type="button">Kaldır</button>';
       }
-
+      (function(){
+      const pid = (typeof window!=="undefined" && window.__OPS_FILTER_PID) ? String(window.__OPS_FILTER_PID||"") : "";
+      let chip = "";
+      if(pid){
+        let pname = "";
+        try{
+          const pp = (db.products||[]).find(x=>x.id===pid);
+          pname = pp ? (pp.name||pid.slice(0,8)) : pid.slice(0,8);
+        }catch(e){ pname = pid.slice(0,8); }
+        chip =
+          '<span class="opsFilterChip">Filtre: <b>'+esc(pname)+'</b></span>' +
+          ' <button class="btn opsXBtn btnGhost" id="btnOpsClearFilter" type="button">Kaldır</button>';
+      }
       head.innerHTML =
         '<div class="opsMiniRow">'+
           '<div class="name">Son İşlemler</div>'+
           '<div class="opsMiniMeta">'+chip+' &nbsp; Toplam: <b>'+ops.length+'</b></div>'+
         '</div>';
-    })();})();
+    })();
+    })();
 
     
       list.appendChild(head);
-
-      // V69: filtre kaldır butonu (varsa) bağla
-      try{
-        const bx = document.getElementById("btnOpsClearFilter");
-        if(bx && !bx.__bound){
-          bx.__bound = true;
-          bx.addEventListener("click", ()=>{
-            try{ window.__OPS_FILTER_PID = ""; }catch(e){}
-            try{ sessionStorage.removeItem("ops_filter_pid"); }catch(e){}
-            try{ renderOpsVirtual(); }catch(e){}
-            try{ window.renderProducts && window.renderProducts(); }catch(e){}
-            try{ window.reportToday && window.reportToday(); }catch(e){}
-            try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
-          });
-        }
-      }catch(e){}
-
 
       // V64B: filtre kaldır butonu (varsa) bağla
       try{
