@@ -4395,6 +4395,85 @@ document.addEventListener("DOMContentLoaded", ()=>{
   }catch(e){}
 });
 
+
+/* V54_RENDER_SCHEDULER */
+(function(){
+  const Q = [];
+  let running = false;
+  const lastRun = new Map(); // key -> ms
+  const MIN_GAP = 300;
+
+  function now(){ try{ return Date.now(); }catch(e){ return 0; } }
+
+  function drain(){
+    if(running) return;
+    if(!Q.length) return;
+    running = true;
+
+    const job = Q.shift();
+    // işi bir sonraki frame + kısa timeout ile çalıştır (UI nefes alsın)
+    try{
+      requestAnimationFrame(()=> {
+        setTimeout(()=> {
+          try{ job.fn(); }catch(e){}
+          running = false;
+          drain();
+        }, 0);
+      });
+    }catch(e){
+      // fallback
+      try{ job.fn(); }catch(e2){}
+      running = false;
+      drain();
+    }
+  }
+
+  window.__scheduleRender = function(key, fn){
+    try{
+      const t = now();
+      const prev = lastRun.get(key) || 0;
+      if(t - prev < MIN_GAP){
+        return; // çok sık çağrı -> yut
+      }
+      lastRun.set(key, t);
+      Q.push({key, fn});
+      drain();
+    }catch(e){
+      // scheduler patlarsa direkt çalıştır
+      try{ fn(); }catch(e2){}
+    }
+  };
+
+  // Güvenli wrapper’lar
+  window.__renderReportSafe = function(){
+    window.__scheduleRender("report", ()=>{ try{ window.reportToday && window.reportToday(); }catch(e){} });
+  };
+  window.__renderAlarmSafe = function(){
+    window.__scheduleRender("alarm", ()=>{ try{ window.renderAlarm && window.renderAlarm(); }catch(e){} });
+  };
+  window.__renderOpsSafe = function(){
+    window.__scheduleRender("ops", ()=>{ try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){} });
+  };
+})();
+
+
+/* V54_ACTIVE_PRODUCT_CHANGE_REFRESH */
+document.addEventListener("DOMContentLoaded", ()=>{
+  try{
+    const sel = document.getElementById("globalProdSelect");
+    if(sel && !sel.__v54_bound){
+      sel.__v54_bound = true;
+      sel.addEventListener("change", ()=>{
+        try{
+          window.__renderReportSafe && window.__renderReportSafe();
+          window.__renderAlarmSafe && window.__renderAlarmSafe();
+          window.__renderOpsSafe && window.__renderOpsSafe();
+        }catch(e){}
+      });
+    }
+  }catch(e){}
+});
+
 </script>
 
   <!-- V291: Gemini tarzı hafif alt sekme -->
