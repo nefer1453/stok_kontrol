@@ -1227,6 +1227,7 @@ try{
 /* V67_ACTIVE_TOAST */
 /* V68_SAVE_STATUS_BADGE */
 /* V70_OPS_RANGE_FILTER */
+/* V70C_OPS_CLEANUP_DUPLICATES */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -4748,13 +4749,6 @@ function renderOpsVirtual(){
     const head = document.createElement("div");
     head.className = "item";
     
-const pid = window.__OPS_FILTER_PID || "";
-let chip = "";
-if(pid){
-  const prod = (db.products||[]).find(x=>x.id===pid);
-  const pname = prod ? (prod.name||pid.slice(0,8)) : pid.slice(0,8);
-  chip = '<span class="opsFilterChip">Filtre: <b>'+esc(pname)+'</b></span>';
-}
 (function(){
       const pid = (typeof window!=="undefined" && window.__OPS_FILTER_PID) ? String(window.__OPS_FILTER_PID||"") : "";
       let chip = "";
@@ -4855,9 +4849,6 @@ if(pid){
               ? `<div class="opsSubLine">Koli: <b>${o.packCount}</b> × <b>${o.packSize}</b> = <b>${o.packCount*o.packSize}</b> adet</div>`
               : (unit==="koli" && o.packCount ? `<div class="opsSubLine">Koli: <b>${o.packCount}</b> (koli içi yok)</div>` : "")
             }
-          ${(unit==="koli" && o.packCount && o.packSize)
-          ? `<div class="opsSubLine">Koli: <b>${o.packCount}</b> × <b>${o.packSize}</b> = <b>${o.packCount*o.packSize}</b> adet</div>`
-          : ""}
         <div class="opsMiniMeta">${esc(fmtDT(o.ts))}</div>
         `;
         list.appendChild(row);
