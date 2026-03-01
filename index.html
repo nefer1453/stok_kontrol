@@ -998,6 +998,7 @@ main{ padding-bottom: 92px !important; }
 /* V46_OPS_FOLLOWS_ACTIVE_PRODUCT */
 /* V47_ACTIVE_BADGE_AND_ALARM_FOLLOW */
 /* V48B_ALARM_7_15_30_SAFE */
+/* V49_ACTIVE_PRODUCT_MASTER */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -4031,6 +4032,126 @@ window.setActivePid = function(pid){
   }, 120);
 
   window.__V47_ACTIVE_BADGE = true;
+})();
+
+
+/* V49_ACTIVE_PRODUCT_MASTER */
+(function(){
+  const KEY = "stok_active_pid";
+
+  function safeDB(){
+    try{ return (typeof loadDB==="function") ? loadDB() : {products:[], ops:[], meta:{}}; }catch(e){ return {products:[], ops:[], meta:{}}; }
+  }
+
+  function getActivePid(){
+    try{
+      // 1) RAM
+      if(window.ACTIVE_PID && window.ACTIVE_PID!=="all") return String(window.ACTIVE_PID);
+      // 2) storage
+      const v = localStorage.getItem(KEY);
+      if(v && v!=="all" && v!=="*") return v;
+      // 3) select
+      const sel = document.getElementById("globalProdSelect");
+      if(sel && sel.value && sel.value!=="all" && sel.value!=="*") return sel.value;
+    }catch(e){}
+    return "";
+  }
+
+  function setActivePid(pid){
+    try{
+      pid = String(pid||"");
+      if(!pid || pid==="all" || pid==="*"){
+        window.ACTIVE_PID = "";
+        try{ localStorage.removeItem(KEY); }catch(e){}
+        const sel = document.getElementById("globalProdSelect");
+        if(sel) sel.value = "";
+        return;
+      }
+      window.ACTIVE_PID = pid;
+      try{ localStorage.setItem(KEY, pid); }catch(e){}
+      const sel = document.getElementById("globalProdSelect");
+      if(sel) sel.value = pid;
+    }catch(e){}
+  }
+
+  function rebuildGlobalSelect(){
+    const sel = document.getElementById("globalProdSelect");
+    if(!sel) return;
+
+    const db = safeDB();
+    const list = (db.products||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"tr"));
+
+    const cur = getActivePid();
+
+    // Baştan kur (en temizi)
+    const opts = [];
+    opts.push('<option value="">(Tümü)</option>');
+    for(const p of list){
+      const id = String(p.id||"");
+      if(!id) continue;
+      const nm = String(p.name||id);
+      opts.push('<option value="'+id.replace(/"/g,'&quot;')+'">'+nm.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</option>');
+    }
+    sel.innerHTML = opts.join("");
+
+    // restore
+    if(cur){
+      sel.value = cur;
+      window.ACTIVE_PID = cur;
+    }else{
+      sel.value = "";
+      window.ACTIVE_PID = "";
+    }
+  }
+
+  function refreshAll(){
+    // Ürün listesi
+    try{ if(typeof renderProducts==="function") renderProducts(); }catch(e){}
+    // Ops panel
+    try{ if(typeof window.renderOpsPanel==="function") window.renderOpsPanel(); }catch(e){}
+    // Alarm
+    try{ if(typeof renderAlarm==="function") renderAlarm(); }catch(e){}
+    // Rapor: hangi gün seçiliyse onu bas
+    try{
+      if(typeof reportForDays==="function"){
+        // önce REPORT_LAST_DAYS varsa onu kullan
+        if(typeof REPORT_LAST_DAYS!=="undefined" && REPORT_LAST_DAYS) reportForDays(REPORT_LAST_DAYS);
+        else reportForDays(1);
+      }
+    }catch(e){}
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    // select'i kur
+    try{ rebuildGlobalSelect(); }catch(e){}
+
+    const sel = document.getElementById("globalProdSelect");
+    if(sel){
+      sel.addEventListener("change", ()=>{
+        try{
+          setActivePid(sel.value||"");
+          // filtre değişti -> her şeyi tazele
+          refreshAll();
+        }catch(e){}
+      });
+    }
+
+    // ilk açılışta storage varsa uygula
+    try{
+      const v = localStorage.getItem(KEY);
+      if(v && v!=="all" && v!=="*"){
+        setActivePid(v);
+      }
+    }catch(e){}
+
+    // ilk paint
+    try{ refreshAll(); }catch(e){}
+  });
+
+  // dışarıdan da çağrılabilsin
+  window.getActivePidV49 = getActivePid;
+  window.setActivePidV49 = setActivePid;
+  window.refreshAllV49 = refreshAll;
 })();
 
 </script>
