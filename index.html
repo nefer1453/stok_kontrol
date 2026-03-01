@@ -883,6 +883,24 @@ main{ padding-bottom: 92px !important; }
 /* V71_OPS_KPI_RANGE_BRACE */
 .opsMiniMeta b{ letter-spacing:.2px; }
 
+
+/* V71C_OPS_RANGE_KPI_SAFEST */
+.opsRangeBar{
+  display:flex;
+  gap:8px;
+  margin-top:10px;
+  flex-wrap:wrap;
+}
+.opsRangeBtn{
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+}
+.opsRangeOn{
+  outline:2px solid rgba(255,255,255,.18);
+}
+.opsMiniMeta b{ letter-spacing:.2px; }
+
 </style>
 </head>
 <body>
@@ -4723,19 +4741,35 @@ document.addEventListener("DOMContentLoaded", ()=>{
     try{ return new Date(Number(ts||0)).toLocaleString("tr-TR"); }catch(e){ return ""; }
   }
 
-  function buildOpsArray(db){
-    let ops = (db.ops||[]).slice();
-    ops.sort((a,b)=>(Number(b.ts||0)-Number(a.ts||0)));
-
-    // Ürün filtresi (Ürün kartındaki “İşlemler” butonu bunu set ediyordu)
-    const pid = safe(()=>window.__OPS_FILTER_PID) || "";
-    if(pid){
-      ops = ops.filter(o=>o &function renderOpsVirtual(){
+  functiofunction renderOpsVirtual(){
     const list = $("opsList");
     if(!list) return;
 
     const db = safe(()=>loadDB()) || {products:[], ops:[]};
     let ops = buildOpsArray(db);
+    // V71C: Ops range (all/today/7d/30d) + KPI hesap
+    try{
+      const range = String(window.__OPS_RANGE || "all");
+      if(range !== "all"){
+        const now = Date.now();
+        const day = 24*60*60*1000;
+        const lim = (range==="today") ? 1*day : (range==="7d") ? 7*day : (range==="30d") ? 30*day : 0;
+        if(lim>0){
+          ops = (ops||[]).filter(o => (now - Number(o.ts||0)) <= lim);
+        }
+      }
+    }catch(e){}
+
+    let __kpiPlus=0, __kpiMinus=0;
+    try{
+      for(const o of (ops||[])){
+        const q = Number(o.qty||0);
+        if(o && o.dir === "+") __kpiPlus += q;
+        else if(o && o.dir === "-") __kpiMinus += q;
+      }
+    }catch(e){}
+    const __kpiNet = (__kpiPlus - __kpiMinus);
+
     // V71: OPS_RANGE + KPI (today/7d/30d/all)
     try{
       const range = String((window.__OPS_RANGE || "all"));
@@ -4799,13 +4833,49 @@ document.addEventListener("DOMContentLoaded", ()=>{
       head.innerHTML =
         '<div class="opsMiniRow">'+
           '<div class="name">Son İşlemler</div>'+
-          '<div class="opsMiniMeta">'+chip+' &nbsp; Toplam: <b>'+ops.length+'</b></div>'+
+          '<div class="opsMiniMeta">'+chip+' &nbsp;
+    /* V71C_RANGES_UI */
+    try{
+      const r = String(window.__OPS_RANGE || "all");
+      const bar = document.createElement("div");
+      bar.className = "opsRangeBar";
+      bar.innerHTML =
+        '<button class="btn opsRangeBtn'+(r==="all"?' opsRangeOn':'')+'" data-range="all" type="button">All</button>'+
+        '<button class="btn opsRangeBtn'+(r==="today"?' opsRangeOn':'')+'" data-range="today" type="button">Today</button>'+
+        '<button class="btn opsRangeBtn'+(r==="7d"?' opsRangeOn':'')+'" data-range="7d" type="button">7d</button>'+
+        '<button class="btn opsRangeBtn'+(r==="30d"?' opsRangeOn':'')+'" data-range="30d" type="button">30d</button>';
+      // head item'ın içine ikinci satır olarak ekle
+      head.appendChild(bar);
+
+      bar.querySelectorAll("button[data-range]").forEach(b=>{
+        b.addEventListener("click", ()=>{
+          try{ window.__OPS_RANGE = b.getAttribute("data-range") || "all"; }catch(e){}
+          try{ renderOpsVirtual(); }catch(e){}
+        });
+      });
+    }catch(e){}
+ Toplam: <b>'+ops.length+'</b></div>'+
         '</div>';
     })();
     })();
 
     
       list.appendChild(head);
+
+
+    /* V71C_KPI_UI */
+    try{
+      const k = document.createElement("div");
+      k.className = "item";
+      k.innerHTML =
+        '<div class="row" style="justify-content:space-between;gap:10px">'+
+          '<div class="name">Özet</div>'+
+          '<div class="opsMiniMeta">+'+
+            '<b>'+__kpiPlus+'</b> / -<b>'+__kpiMinus+'</b> / net <b>'+__kpiNet+'</b>'+
+          '</div>'+
+        '</div>';
+      list.appendChild(k);
+    }catch(e){}
 
       // V71: KPI satırı (+/-/net)
       try{
@@ -4892,6 +4962,19 @@ document.addEventListener("DOMContentLoaded", ()=>{
       if(i < total){
         moreBtn.textContent = "Daha fazla göster ("+(total-i)+")";
         if(!moreBtn.isConnected) list.appendChild(moreBtn);
+      }else{
+        if(moreBtn.isConnected) moreBtn.remove();
+      }
+    }
+
+    moreBtn.onclick = ()=>{
+      // kullanıcı basınca bir batch daha
+      setTimeout(paintBatch, TICK);
+    };
+
+    // İlk batch’i parça parça basalım (UI donmasın)
+    setTimeout(paintBatch, TICK);
+  }Btn);
       }else{
         if(moreBtn.isConnected) moreBtn.remove();
       }
@@ -5437,3 +5520,5 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
 </body>
 </html>
+
+/* V71C_OPS_RANGE_KPI_SAFEST */
