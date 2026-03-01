@@ -2027,10 +2027,17 @@ function opsInDays(db, days){
     return d>=from;
   });
 }
+/* V55_REPORT_OPTIMIZED */
 function reportForDays(days){
   let db = loadDB();
   if(window.applyActivePidFilter) db = window.applyActivePidFilter(db);
   let ops=opsInDays(db, days);
+
+// V55: ürün map (find() maliyetini düşür)
+const __prodMap = new Map();
+for(const pp of (db.products||[])){
+  if(pp && pp.id) __prodMap.set(pp.id, pp);
+}
   // V29: ürün filtresi
   if(typeof REPORT_PID==='string' && REPORT_PID){ ops = ops.filter(o=>o.pid===REPORT_PID); }
   try{ setCenterKPIs(ops); }catch(e){}
@@ -2046,7 +2053,7 @@ function reportForDays(days){
   // Top ürünler
   const m=new Map();
   for(const o of ops){
-    const p=db.products.find(x=>x.id===o.pid);
+    const p=__prodMap.get(o.pid);
     if(!p) continue;
     const key=p.id;
     const cur=m.get(key)||{name:p.name, score:0, plus:0, minus:0};
@@ -2054,7 +2061,7 @@ function reportForDays(days){
     cur.score += Number(o.qty||0);
     m.set(key,cur);
   }
-  const top=[...m.values()].sort((a,b)=>(b.plus+b.minus)-(a.plus+a.minus)).slice(0,8);
+  const top=[...m.values()].sort((a,b)=>(b.plus+b.minus)-(a.plus+a.minus)).slice(0,60);
   $("rTop").innerHTML = top.length ? top.map(x=>`
     <div class="item">
       <div class="row" style="justify-content:space-between">
@@ -2071,7 +2078,7 @@ function reportForDays(days){
     const k=o.typeLabel||o.type||"";
     tm.set(k, (tm.get(k)||0) + Number(o.qty||0));
   }
-  const trows=[...tm.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const trows=[...tm.entries()].sort((a,b)=>b[1]-a[1]).slice(0,60);
   $("rTypes").innerHTML = trows.length ? trows.map(([k,v])=>`
     <div class="item">
       <div class="row" style="justify-content:space-between">
