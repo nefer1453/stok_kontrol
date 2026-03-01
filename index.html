@@ -952,7 +952,7 @@ main{ padding-bottom: 92px !important; }
     </div>
 
     <div class="hint">Hızlı adet / koli</div>
-    <div class="miniRow" id="quickQtyRow"></div>
+    
 
 
     <div class="miniRow" id="qtyRow" style="margin-top:8px"></div>
@@ -1014,6 +1014,7 @@ main{ padding-bottom: 92px !important; }
 /* V48B_ALARM_7_15_30_SAFE */
 /* V49_ACTIVE_PRODUCT_MASTER */
 /* V50_FOCUS_MODE_ACTIVE_PRODUCT */
+/* V51_FOCUS_SYNC_BUGFIX */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -1847,6 +1848,20 @@ saveDB(db);
 
 
 function openModal(pid, dirHint){
+
+  /* V51_SYNC_ACTIVE_TO_MODAL */
+  try{
+    const g = document.getElementById("globalProdSelect");
+    const op = document.getElementById("opProd");
+    if(g && op && g.value){
+      // Eğer openModal pid ile gelmediyse veya pid boşsa, aktif ürünü modal'a bas
+      if(!pid){
+        op.value = g.value;
+        pid = g.value;
+      }
+    }
+  }catch(e){}
+
   $("modal").style.display="block";
   fillProdSelect();
   if(pid) $("opProd").value=pid;
@@ -4290,6 +4305,66 @@ window.setActivePid = function(pid){
 
     // ilk açılışta tag ayarla
     try{ setTag(); }catch(e){}
+  });
+})();
+
+
+
+/* V51_FOCUS_SYNC_BUGFIX */
+(function(){
+  function syncReportFilter(){
+    try{
+      const g = document.getElementById("globalProdSelect");
+      const r = document.getElementById("reportProdFilter");
+      if(!g || !r) return;
+      // report filtresi boşsa veya farklıysa global'e eşitle (tümü durumunu da koru)
+      if(r.value !== g.value){
+        r.value = g.value;
+      }
+    }catch(e){}
+  }
+
+  function refreshAllSoft(){
+    try{ syncReportFilter(); }catch(e){}
+    try{
+      if(typeof window.REPORT_LAST_DAYS === "number" && window.reportForDays){
+        window.reportForDays(window.REPORT_LAST_DAYS);
+      }else if(window.reportToday){
+        window.reportToday();
+      }
+    }catch(e){}
+    try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+    try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+    try{ window.renderProducts && window.renderProducts(); }catch(e){}
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    // ilk açılışta eşitle
+    try{ syncReportFilter(); }catch(e){}
+
+    // global select değişince raporu da güncelle
+    const g = document.getElementById("globalProdSelect");
+    if(g){
+      g.addEventListener("change", ()=>{
+        // V51: rapor filtresi + ekranlar senkron
+        refreshAllSoft();
+      });
+    }
+
+    // rapor filtresi elle değişirse, global’i de eşitle (kafa karışmasın)
+    const r = document.getElementById("reportProdFilter");
+    if(r){
+      r.addEventListener("change", ()=>{
+        try{
+          const g2 = document.getElementById("globalProdSelect");
+          if(g2 && g2.value !== r.value){
+            g2.value = r.value;
+            try{ localStorage.setItem("stok_active_pid", r.value||""); }catch(e){}
+          }
+        }catch(e){}
+        refreshAllSoft();
+      });
+    }
   });
 })();
 
