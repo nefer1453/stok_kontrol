@@ -616,6 +616,14 @@ main{ padding-bottom: 92px !important; }
   font-size:12px; font-weight:950;
 }
 
+
+/* V44_ALARM_7_15_30 */
+.alarmBar{
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+  margin-top:10px;
+}
+.alarmBar .hint{margin:0}
+
 </style>
 </head>
 <body>
@@ -933,6 +941,7 @@ main{ padding-bottom: 92px !important; }
 /* V32_GLOBAL_ACTIVE_PRODUCT */
 /* V32_REPORT_FILTER_ACTIVE_PRODUCT + FIX_B15 */
 /* V43_SYNC_SELECTS_OPS_FILTER */
+/* V44_ALARM_7_15_30 */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -3488,6 +3497,61 @@ window.setActivePid = function(pid){
 
   // dışarıdan da tek satırda setlemek isteyen olursa:
   window.setActivePidV43 = setPid;
+})();
+
+
+
+/* V44_ALARM_7_15_30 */
+(function(){
+  const KEY = "stok_alarm_days_v44";
+
+  function ui(days){
+    const b7  = document.getElementById("btnAlarm7");
+    const b15 = document.getElementById("btnAlarm15");
+    const b30 = document.getElementById("btnAlarm30");
+    if(b7)  b7.classList.toggle("alarmBtnOn", days===7);
+    if(b15) b15.classList.toggle("alarmBtnOn", days===15);
+    if(b30) b30.classList.toggle("alarmBtnOn", days===30);
+
+    const info = document.getElementById("alarmInfo");
+    if(info) info.textContent = "son " + days + " gün";
+  }
+
+  function getSaved(){
+    let v = 7;
+    try{ v = parseInt(localStorage.getItem(KEY)||"7",10)||7; }catch(e){}
+    if(v!==7 && v!==15 && v!==30) v=7;
+    return v;
+  }
+
+  function save(v){
+    try{ localStorage.setItem(KEY, String(v)); }catch(e){}
+  }
+
+  // renderAlarm mevcutsa kullanacağız
+  window.setAlarmDaysV44 = function(days){
+    days = (days===15?15:(days===30?30:7));
+    try{ window.ALARM_DAYS = days; }catch(e){}
+    save(days);
+    ui(days);
+    try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+  };
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    const b7  = document.getElementById("btnAlarm7");
+    const b15 = document.getElementById("btnAlarm15");
+    const b30 = document.getElementById("btnAlarm30");
+
+    if(b7)  b7.onclick  = ()=> window.setAlarmDaysV44(7);
+    if(b15) b15.onclick = ()=> window.setAlarmDaysV44(15);
+    if(b30) b30.onclick = ()=> window.setAlarmDaysV44(30);
+
+    // eski setAlarmDays varsa da ez (tek doğru kaynak V44 olsun)
+    try{ window.setAlarmDays = window.setAlarmDaysV44; }catch(e){}
+
+    // ilk kurulum: kayıtlı değer
+    try{ window.setAlarmDaysV44(getSaved()); }catch(e){}
+  });
 })();
 
 </script>
