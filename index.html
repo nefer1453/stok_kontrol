@@ -707,6 +707,24 @@ main{ padding-bottom: 92px !important; }
   font-weight:950;
 }
 
+
+/* V57_OPS_RICHER_REAL */
+.opsFilterChip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  font-size:12px;
+}
+.opsSubLine{
+  font-size:12px;
+  opacity:.85;
+  margin-top:4px;
+}
+
 </style>
 </head>
 <body>
@@ -4545,7 +4563,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
     return ops;
   }
 
-  function renderOpsVirtual(){
+  /* V57_OPS_RICHER_REAL */
+function renderOpsVirtual(){
     const list = $("opsList");
     if(!list) return;
 
@@ -4562,7 +4581,19 @@ document.addEventListener("DOMContentLoaded", ()=>{
     // başlık gibi mini bilgi
     const head = document.createElement("div");
     head.className = "item";
-    head.innerHTML = '<div class="opsMiniRow"><div class="name">Son İşlemler</div><div class="opsMiniMeta">Toplam: <b>'+ops.length+'</b></div></div>';
+    
+const pid = window.__OPS_FILTER_PID || "";
+let chip = "";
+if(pid){
+  const prod = (db.products||[]).find(x=>x.id===pid);
+  const pname = prod ? (prod.name||pid.slice(0,8)) : pid.slice(0,8);
+  chip = '<span class="opsFilterChip">Filtre: <b>'+esc(pname)+'</b></span>';
+}
+head.innerHTML = '<div class="opsMiniRow">'+
+  '<div class="name">Son İşlemler</div>'+
+  '<div class="opsMiniMeta">'+chip+' Toplam: <b>'+ops.length+'</b></div>'+
+'</div>';
+
     list.appendChild(head);
 
     let i = 0;
@@ -4593,7 +4624,10 @@ document.addEventListener("DOMContentLoaded", ()=>{
             <div class="tag">${dir}${qty} ${esc(unit)}</div>
           </div>
           <div class="muted">${esc(typeLabel(o))}${sub?(" • "+esc(sub)):""}${note?(" • "+esc(note)):""}</div>
-          <div class="opsMiniMeta">${esc(fmtDT(o.ts))}</div>
+          ${(unit==="koli" && o.packCount && o.packSize)
+          ? `<div class="opsSubLine">Koli: <b>${o.packCount}</b> × <b>${o.packSize}</b> = <b>${o.packCount*o.packSize}</b> adet</div>`
+          : ""}
+        <div class="opsMiniMeta">${esc(fmtDT(o.ts))}</div>
         `;
         list.appendChild(row);
       }
