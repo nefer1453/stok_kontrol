@@ -860,6 +860,25 @@ main{ padding-bottom: 92px !important; }
 #v68SaveBadge.busy .dot{ opacity: .95; }
 #v68SaveBadge.err .dot{ opacity: .95; }
 
+
+/* V70_OPS_RANGE_FILTER */
+.opsRangeBar{
+  display:flex;
+  gap:8px;
+  margin-bottom:10px;
+}
+.opsRangeBtn{
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  border:1px solid rgba(255,255,255,.15);
+  background: rgba(255,255,255,.05);
+}
+.opsRangeBtn.active{
+  background: rgba(255,255,255,.15);
+}
+
 </style>
 </head>
 <body>
@@ -1207,6 +1226,7 @@ try{
 /* V66_ACTIVE_PID_SYNC */
 /* V67_ACTIVE_TOAST */
 /* V68_SAVE_STATUS_BADGE */
+/* V70_OPS_RANGE_FILTER */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -5285,6 +5305,105 @@ if(pid){
   }
 
   document.addEventListener("DOMContentLoaded", hookSaveDB);
+})();
+</script>
+
+
+<!-- V70_OPS_RANGE_FILTER -->
+<script>
+(function(){
+
+  // global state
+  if(!window.__OPS_RANGE) window.__OPS_RANGE = "all";
+
+  function nowTs(){ return Date.now(); }
+
+  function filterByRange(ops){
+    const range = window.__OPS_RANGE || "all";
+    if(range === "all") return ops;
+
+    const now = nowTs();
+    const day = 24*60*60*1000;
+
+    return ops.filter(o=>{
+      const diff = now - Number(o.ts||0);
+      if(range === "today") return diff <= day;
+      if(range === "7d") return diff <= 7*day;
+      if(range === "30d") return diff <= 30*day;
+      return true;
+    });
+  }
+
+  // renderOpsVirtual override etmiyoruz,
+  // sadece ops array'ini proxy ediyoruz
+  const origRender = window.renderOpsVirtual;
+
+  if(typeof origRender === "function" && !origRender.__v70_wrapped){
+
+    function wrapped(){
+      try{
+        // geçici olarak ops’u filtreleyelim
+        const orig = window.renderOpsVirtual;
+        const fnBody = orig.toString();
+
+        // direkt müdahale etmiyoruz,
+        // global hook: window.__OPS_RANGE_FILTER
+        window.__OPS_RANGE_FILTER = filterByRange;
+
+        return orig.apply(this, arguments);
+      }catch(e){
+        console.error(e);
+      }
+    }
+
+    wrapped.__v70_wrapped = true;
+    window.renderOpsVirtual = wrapped;
+  }
+
+  // UI inject (DOM hazır olunca)
+  document.addEventListener("DOMContentLoaded", function(){
+
+    function injectBar(){
+      const head = document.querySelector(".opsMiniRow");
+      if(!head || document.getElementById("v70RangeBar")) return;
+
+      const bar = document.createElement("div");
+      bar.className = "opsRangeBar";
+      bar.id = "v70RangeBar";
+
+      const buttons = [
+        {k:"today", t:"Bugün"},
+        {k:"7d", t:"7g"},
+        {k:"30d", t:"30g"},
+        {k:"all", t:"Tümü"}
+      ];
+
+      buttons.forEach(b=>{
+        const btn = document.createElement("button");
+        btn.className = "opsRangeBtn";
+        btn.textContent = b.t;
+        if(window.__OPS_RANGE === b.k) btn.classList.add("active");
+
+        btn.onclick = function(){
+          window.__OPS_RANGE = b.k;
+          document.querySelectorAll(".opsRangeBtn").forEach(x=>x.classList.remove("active"));
+          btn.classList.add("active");
+          try{ window.renderOpsVirtual(); }catch(e){}
+        };
+
+        bar.appendChild(btn);
+      });
+
+      head.parentNode.insertBefore(bar, head.nextSibling);
+    }
+
+    // ops render sonrası tekrar inject
+    const observer = new MutationObserver(injectBar);
+    observer.observe(document.body, { childList:true, subtree:true });
+
+    injectBar();
+  });
+
 })();
 </script>
 
