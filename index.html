@@ -674,6 +674,20 @@ main{ padding-bottom: 92px !important; }
   background: rgba(239,68,68,.16);
 }
 
+
+/* V50_FOCUS_MODE_ACTIVE_PRODUCT */
+.focusPill{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:7px 12px;
+  border-radius:999px;
+  border:1px solid rgba(37,99,235,.35);
+  background:rgba(37,99,235,.12);
+  color:#dbeafe;
+  font-weight:950;
+  font-size:12px;
+}
+.focusPill b{ color:#fff; }
+
 </style>
 </head>
 <body>
@@ -999,6 +1013,7 @@ main{ padding-bottom: 92px !important; }
 /* V47_ACTIVE_BADGE_AND_ALARM_FOLLOW */
 /* V48B_ALARM_7_15_30_SAFE */
 /* V49_ACTIVE_PRODUCT_MASTER */
+/* V50_FOCUS_MODE_ACTIVE_PRODUCT */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -1442,9 +1457,17 @@ function renderProducts(){
   list.innerHTML="";
   $("pCount").textContent=String(db.products.length);
 
-  const filtered = db.products.filter(p=>!q || (p.name||"").toLowerCase().includes(q));
+  let filtered = db.products.filter(p=>!q || (p.name||"").toLowerCase().includes(q));
 
-  if(!filtered.length){
+  
+  // V50: odak modunda sadece seçili ürün
+  try{
+    const ap = (window.getActivePid ? window.getActivePid() : "");
+    if(ap){
+      filtered = filtered.filter(x => x && x.id === ap);
+    }
+  }catch(e){}
+if(!filtered.length){
     list.innerHTML = `<div class="item"><div class="hint">Ürün yok / arama sonucu boş.</div></div>`;
     fillProdSelect(); // modal select güncel kalsın
     reportToday();
@@ -3076,7 +3099,45 @@ function renderAlarm(){
 const list = document.getElementById("alarmList");
   if(!list) return;
 
-  const metas = [];
+  
+  // V50: Odak varsa Alarm'ı tek ürüne indir (net/hız/eta)
+  try{
+    const pid = (window.getActivePid ? window.getActivePid() : "");
+    if(pid){
+      const p = (db.products||[]).find(x=>x.id===pid);
+      const m = calcCritical(db, pid, ALARM_DAYS);
+
+      const d = isFinite(m.daysLeft) ? Math.max(0, Math.round(m.daysLeft)) : null;
+      const speed = (m.avgDaily>0) ? m.avgDaily.toFixed(1) : "0";
+      const title = p ? (p.name||"Seçili Ürün") : "Seçili Ürün";
+
+      let badge = "";
+      if(m.level==="red") badge = `<span class="badgeRed">🟥 Kritik${d!==null?(" • ~"+d+"g"):""}</span>`;
+      else if(m.level==="warn") badge = `<span class="badgeWarn">🟧 Uyarı${d!==null?(" • ~"+d+"g"):""}</span>`;
+      else badge = `<span class="tag">🟩 Normal</span>`;
+
+      list.innerHTML = `
+        <div class="alarmItem">
+          <div class="alarmTop">
+            <div style="flex:1">
+              <div class="alarmName">${escapeHTML(title)}</div>
+              <div class="alarmMeta">Net: <b>${m.net}</b> • ${ALARM_DAYS}g eksi akış: <b>${m.out}</b> • gün/çıkış: <b>${speed}</b>${d!==null?(" • ~"+d+"g"):""}</div>
+            </div>
+            <div>${badge}</div>
+          </div>
+        </div>
+      `;
+      // sayaçları da temizle
+      const aCritCount = document.getElementById("aCritCount");
+      const aNegCount  = document.getElementById("aNegCount");
+      const aZeroCount = document.getElementById("aZeroCount");
+      if(aCritCount) aCritCount.textContent = (m.level==="ok" ? "0" : "1");
+      if(aNegCount)  aNegCount.textContent  = (m.net<0 ? "1" : "0");
+      if(aZeroCount) aZeroCount.textContent = (m.net===0 ? "1" : "0");
+      return;
+    }
+  }catch(e){}
+const metas = [];
   let neg=0, zero=0;
 
   for(const p of (db.products||[])){
@@ -3246,14 +3307,30 @@ document.addEventListener("DOMContentLoaded", function(){
   /* V34_FIX_GLOBAL_PID */
 
 window.getActivePid = function(){
-  try{
-    const sel = document.getElementById("globalProdSelect");
-    if(sel && sel.value && sel.value!=="all" && sel.value!=="*"){
-      return sel.value;
-    }
-  }catch(e){}
-  return "";
-};
+      try{
+        // 1) EN NET KAYNAK: globalProdSelect
+        const sel = document.getElementById("globalProdSelect");
+        if(sel && sel.value && sel.value!=="all" && sel.value!=="*") return String(sel.value);
+
+        // 2) global değişken
+        if(window.ACTIVE_PID) return String(window.ACTIVE_PID||"");
+
+        // 3) LocalStorage ihtimalleri
+        const keys = ["stok_active_pid","stok_kontrol_active_pid","stok_focus_pid","active_pid"];
+        for(const k of keys){
+          const v = localStorage.getItem(k);
+          if(v && v!=="all" && v!=="*") return v;
+        }
+
+        // 4) Diğer DOM select ihtimalleri
+        const ids = ["activeProd","activeProdSel","selActiveProd","activeProduct","focusProd","prodFocus","selFocusProd"];
+        for(const id of ids){
+          const el = document.getElementById(id);
+          if(el && el.value && el.value!=="all" && el.value!=="*") return el.value;
+        }
+      }catch(e){}
+      return "";
+    };
 
 
   window.setActivePid = function(pid){
@@ -4152,6 +4229,68 @@ window.setActivePid = function(pid){
   window.getActivePidV49 = getActivePid;
   window.setActivePidV49 = setActivePid;
   window.refreshAllV49 = refreshAll;
+})();
+
+
+
+/* V50_FOCUS_MODE_ACTIVE_PRODUCT */
+(function(){
+  function refreshAll(){
+    try{ window.renderProducts && window.renderProducts(); }catch(e){}
+    try{
+      // rapor aralığı hatırlanıyorsa onu tekrar bas
+      if(typeof window.REPORT_LAST_DAYS === "number" && window.reportForDays){
+        window.reportForDays(window.REPORT_LAST_DAYS);
+      }else if(window.reportToday){
+        window.reportToday();
+      }
+    }catch(e){}
+    try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+    try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    const sel = document.getElementById("globalProdSelect");
+    if(!sel) return;
+
+    // UI mini bilgi: seçili ürün adı
+    const tag = document.createElement("div");
+    tag.id = "focusTag";
+    tag.className = "focusPill";
+    tag.style.marginTop = "10px";
+    tag.innerHTML = 'Odak: <b>Tümü</b>';
+    // select satırının hemen altına koy
+    try{
+      sel.parentElement && sel.parentElement.appendChild(tag);
+    }catch(e){}
+
+    function setTag(){
+      try{
+        const pid = window.getActivePid ? window.getActivePid() : "";
+        if(!pid){
+          tag.innerHTML = 'Odak: <b>Tümü</b>';
+          return;
+        }
+        const db = (typeof window.loadDB==="function") ? window.loadDB() : {products:[]};
+        const p = (db.products||[]).find(x=>x.id===pid);
+        tag.innerHTML = 'Odak: <b>' + (p?(p.name||"Seçili"): "Seçili") + '</b>';
+      }catch(e){}
+    }
+
+    sel.addEventListener("change", ()=>{
+      try{
+        const v = sel.value || "";
+        window.ACTIVE_PID = v;
+        // kalıcı hafıza (bizim key)
+        localStorage.setItem("stok_active_pid", v);
+      }catch(e){}
+      try{ setTag(); }catch(e){}
+      refreshAll();
+    });
+
+    // ilk açılışta tag ayarla
+    try{ setTag(); }catch(e){}
+  });
 })();
 
 </script>
