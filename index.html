@@ -879,6 +879,10 @@ main{ padding-bottom: 92px !important; }
   background: rgba(255,255,255,.15);
 }
 
+
+/* V71_OPS_KPI_RANGE_BRACE */
+.opsMiniMeta b{ letter-spacing:.2px; }
+
 </style>
 </head>
 <body>
@@ -1228,6 +1232,7 @@ try{
 /* V68_SAVE_STATUS_BADGE */
 /* V70_OPS_RANGE_FILTER */
 /* V70C_OPS_CLEANUP_DUPLICATES */
+/* V71_OPS_KPI_RANGE_BRACE */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -4725,18 +4730,34 @@ document.addEventListener("DOMContentLoaded", ()=>{
     // Ürün filtresi (Ürün kartındaki “İşlemler” butonu bunu set ediyordu)
     const pid = safe(()=>window.__OPS_FILTER_PID) || "";
     if(pid){
-      ops = ops.filter(o=>o && o.pid===pid);
-    }
-    return ops;
-  }
-
-  /* V57_OPS_RICHER_REAL */
-function renderOpsVirtual(){
+      ops = ops.filter(o=>o &function renderOpsVirtual(){
     const list = $("opsList");
     if(!list) return;
 
     const db = safe(()=>loadDB()) || {products:[], ops:[]};
-    const ops = buildOpsArray(db);
+    let ops = buildOpsArray(db);
+    // V71: OPS_RANGE + KPI (today/7d/30d/all)
+    try{
+      const range = String((window.__OPS_RANGE || "all"));
+      if(range !== "all"){
+        const now = Date.now();
+        const day = 24*60*60*1000;
+        const lim = (range==="today") ? 1*day : (range==="7d") ? 7*day : (range==="30d") ? 30*day : 0;
+        if(lim>0){
+          ops = (ops||[]).filter(o => (now - Number((o&&o.ts)||0)) <= lim);
+        }
+      }
+    }catch(e){}
+
+    let __kpiPlus=0, __kpiMinus=0;
+    try{
+      for(const o of (ops||[])){
+        const q = Number((o&&o.qty)||0);
+        if(o && o.dir==="+") __kpiPlus += q;
+        else if(o && o.dir==="-") __kpiMinus += q;
+      }
+    }catch(e){}
+    const __kpiNet = (__kpiPlus - __kpiMinus);
 
     list.innerHTML = "";
 
@@ -4785,6 +4806,20 @@ function renderOpsVirtual(){
 
     
       list.appendChild(head);
+
+      // V71: KPI satırı (+/-/net)
+      try{
+        const k = document.createElement("div");
+        k.className = "item";
+        k.innerHTML =
+          '<div class="row" style="justify-content:space-between;gap:10px">'+
+            '<div class="name">Özet</div>'+
+            '<div class="opsMiniMeta">+'+
+              '<b>'+__kpiPlus+'</b> / -<b>'+__kpiMinus+'</b> / net <b>'+__kpiNet+'</b>'+
+            '</div>'+
+          '</div>';
+        list.appendChild(k);
+      }catch(e){}
 
       // V64B: filtre kaldır butonu (varsa) bağla
       try{
@@ -4868,6 +4903,8 @@ function renderOpsVirtual(){
     };
 
     // İlk batch’i parça parça basalım (UI donmasın)
+    setTimeout(paintBatch, TICK);
+  }parça parça basalım (UI donmasın)
     setTimeout(paintBatch, TICK);
   }
 
