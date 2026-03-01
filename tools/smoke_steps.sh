@@ -1,0 +1,12 @@
+set -e
+echo "== SMOKE TEST (manuel) =="
+echo "1) Ürün ekranı açılıyor mu? Liste geliyor mu?"
+echo "2) Ops sekmesi açılıyor mu? 1-2 sn içinde doluyor mu?"
+echo "3) 'Daha fazla göster' 2-3 kez: donma var mı?"
+echo "4) Ürün kartından 'İşlemler' ile ops'a geç: filtre/chip görünmeli mi?"
+echo "5) 'Kaldır' çalışıyor mu? Liste genişliyor mu?"
+echo "6) Koli işlem gir: ops satırında 'Koli: X × Y = Z' çıkıyor mu?"
+echo "7) Adet işlem gir: koli satırı görünmüyor mu?"
+echo "8) Rapor/Alarm sekmeleri açılıyor mu?"
+echo "9) Konsolda kırmızı error var mı? (mümkünse remote debug)"
+echo "== DONE =="
