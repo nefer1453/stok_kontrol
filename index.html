@@ -821,6 +821,45 @@ main{ padding-bottom: 92px !important; }
   opacity: .9;
 }
 
+
+/* V68_SAVE_STATUS_BADGE */
+#v68SaveBadge{
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 99998;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: .1px;
+  color: rgba(255,255,255,.92);
+  background: rgba(0,0,0,.45);
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,.22);
+  opacity: .0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity .16s ease, transform .16s ease;
+}
+#v68SaveBadge.on{
+  opacity: 1;
+  transform: translateY(0);
+}
+#v68SaveBadge .dot{
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.85);
+  opacity: .9;
+}
+#v68SaveBadge.ok .dot{ opacity: .95; }
+#v68SaveBadge.busy .dot{ opacity: .95; }
+#v68SaveBadge.err .dot{ opacity: .95; }
+
 </style>
 </head>
 <body>
@@ -1167,6 +1206,7 @@ try{
 /* V65_ERROR_GUARD */
 /* V66_ACTIVE_PID_SYNC */
 /* V67_ACTIVE_TOAST */
+/* V68_SAVE_STATUS_BADGE */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -5184,6 +5224,67 @@ if(pid){
   }
 
   document.addEventListener("DOMContentLoaded", bind);
+})();
+</script>
+
+
+<!-- V68_SAVE_STATUS_BADGE -->
+<div id="v68SaveBadge" class="ok"><span class="dot"></span><span id="v68SaveText">Kaydedildi ✅</span></div>
+<script>
+(function(){
+  let hideT = null;
+
+  function badgeEl(){ return document.getElementById("v68SaveBadge"); }
+  function textEl(){ return document.getElementById("v68SaveText"); }
+
+  function show(state, txt){
+    try{
+      const b = badgeEl();
+      const t = textEl();
+      if(!b || !t) return;
+
+      b.classList.remove("ok","busy","err");
+      b.classList.add(state);
+
+      t.textContent = txt;
+      b.classList.add("on");
+
+      if(hideT) clearTimeout(hideT);
+      // Busy iken saklama, ok/err iken 1.2 sn sonra sakla
+      if(state !== "busy"){
+        hideT = setTimeout(()=>{ try{ b.classList.remove("on"); }catch(e){} }, 1200);
+      }
+    }catch(e){}
+  }
+
+  function hookSaveDB(){
+    try{
+      if(typeof window.saveDB !== "function") return;
+
+      if(window.saveDB.__v68_wrapped) return;
+      const orig = window.saveDB;
+
+      function wrapped(db){
+        show("busy","Yazıyor…");
+        try{
+          const r = orig(db);
+          // saveDB sync ise hemen OK
+          show("ok","Kaydedildi ✅");
+          return r;
+        }catch(e){
+          show("err","Kayıt Hatası ⚠️");
+          throw e;
+        }
+      }
+      wrapped.__v68_wrapped = true;
+      window.saveDB = wrapped;
+
+      // ilk açılışta bir kez “hazır” de
+      setTimeout(()=>{ show("ok","Hazır ✅"); }, 450);
+    }catch(e){}
+  }
+
+  document.addEventListener("DOMContentLoaded", hookSaveDB);
 })();
 </script>
 
