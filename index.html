@@ -650,6 +650,30 @@ main{ padding-bottom: 92px !important; }
   font-weight: 950;
 }
 
+
+/* V48B_ALARM_7_15_30_SAFE */
+.alarmBar{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin:10px 0;
+}
+.alarmBtn{
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+  color: var(--muted);
+  padding: 9px 12px;
+  border-radius: 999px;
+  font-weight: 950;
+  cursor:pointer;
+}
+.alarmBtnOn{
+  color: var(--text);
+  border-color: rgba(239,68,68,.35);
+  background: rgba(239,68,68,.16);
+}
+
 </style>
 </head>
 <body>
@@ -973,6 +997,7 @@ main{ padding-bottom: 92px !important; }
 /* V45_ALARM_FOLLOWS_ACTIVE_PRODUCT */
 /* V46_OPS_FOLLOWS_ACTIVE_PRODUCT */
 /* V47_ACTIVE_BADGE_AND_ALARM_FOLLOW */
+/* V48B_ALARM_7_15_30_SAFE */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -1149,6 +1174,21 @@ function setCenterKPIs(ops){
 }
 
 document.addEventListener("DOMContentLoaded", ()=>{
+
+  /* V48B_ALARM_7_15_30_SAFE */
+  try{
+    const b7  = document.getElementById("btnAlarm7");
+    const b15 = document.getElementById("btnAlarm15");
+    const b30 = document.getElementById("btnAlarm30");
+    if(b7)  b7.onclick  = ()=> setAlarmDays(7);
+    if(b15) b15.onclick = ()=> setAlarmDays(15);
+    if(b30) b30.onclick = ()=> setAlarmDays(30);
+
+    let d = 7;
+    try{ d = Number(localStorage.getItem("stok_alarm_days")||"7"); }catch(e){ d=7; }
+    if(d!==7 && d!==15 && d!==30) d=7;
+    setAlarmDays(d);
+  }catch(e){}
   // rapor filtresi bağla
   fillReportFilter();
 
@@ -3091,16 +3131,22 @@ const list = document.getElementById("alarmList");
 }
 
 function setAlarmDays(days){
+  try{ days = Number(days||7); }catch(e){ days = 7; }
+  if(days!==7 && days!==15 && days!==30) days=7;
   ALARM_DAYS = days;
 
   const b7  = document.getElementById("btnAlarm7");
   const b15 = document.getElementById("btnAlarm15");
   const b30 = document.getElementById("btnAlarm30");
 
-  // UI state
   if(b7)  b7.classList.toggle("alarmBtnOn", days===7);
   if(b15) b15.classList.toggle("alarmBtnOn", days===15);
   if(b30) b30.classList.toggle("alarmBtnOn", days===30);
+
+  const info = document.getElementById("alarmInfo");
+  if(info) info.textContent = "Eksi akış: son " + days + " gün";
+
+  try{ localStorage.setItem("stok_alarm_days", String(days)); }catch(e){}
 
   renderAlarm();
 }
