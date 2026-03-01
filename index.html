@@ -1133,6 +1133,7 @@ try{
 /* V62_OPS_CHIP_PACKINFO */
 /* V63D_FIX_OPS_PACKCOUNT_IN_RENDEROPSVIRTUAL */
 /* V64B_OPS_CHIP_CLEAR_PACKINFO */
+/* V65_ERROR_GUARD */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -5020,6 +5021,40 @@ if(pid){
       <button class="navBtn" data-v291="cardReport" type="button">Rapor</button>
     </div>
   </nav>
+
+
+<!-- V65_ERROR_GUARD -->
+<script>
+(function(){
+  function showError(msg){
+    let bar = document.getElementById("__error_guard_bar");
+    if(!bar){
+      bar = document.createElement("div");
+      bar.id="__error_guard_bar";
+      bar.style.position="fixed";
+      bar.style.bottom="0";
+      bar.style.left="0";
+      bar.style.right="0";
+      bar.style.background="#7f1d1d";
+      bar.style.color="#fff";
+      bar.style.padding="8px 12px";
+      bar.style.fontSize="12px";
+      bar.style.zIndex="999999";
+      bar.style.fontFamily="monospace";
+      document.body.appendChild(bar);
+    }
+    bar.textContent="⚠ JS Hatası: " + msg;
+  }
+
+  window.onerror = function(message, source, lineno, colno){
+    showError(message + " @ " + lineno + ":" + colno);
+  };
+
+  window.addEventListener("unhandledrejection", function(e){
+    showError("Promise Error: " + (e.reason || "unknown"));
+  });
+})();
+</script>
 
 </body>
 </html>
