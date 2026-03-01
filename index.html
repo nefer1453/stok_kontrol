@@ -943,6 +943,7 @@ main{ padding-bottom: 92px !important; }
 /* V43_SYNC_SELECTS_OPS_FILTER */
 /* V44_ALARM_7_15_30 */
 /* V45_ALARM_FOLLOWS_ACTIVE_PRODUCT */
+/* V46_OPS_FOLLOWS_ACTIVE_PRODUCT */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -3645,6 +3646,120 @@ window.setActivePid = function(pid){
   });
 
   window.__V45_WRAPPED_ALARM = true;
+})();
+
+
+
+/* V46_OPS_FOLLOWS_ACTIVE_PRODUCT */
+(function(){
+  if(window.__V46_WRAPPED_OPS) return;
+
+  function activePid(){
+    try{
+      const sel = document.getElementById("globalProdSelect");
+      if(sel && sel.value && sel.value!=="all" && sel.value!=="*") return String(sel.value);
+    }catch(e){}
+    try{
+      if(window.getActivePid){
+        const v = window.getActivePid();
+        if(v && v!=="all" && v!=="*") return String(v);
+      }
+    }catch(e){}
+    return "";
+  }
+
+  // renderOpsPanel yoksa da sorun değil: sadece güvenli bind
+  function safeRenderOps(){
+    try{
+      if(typeof window.renderOpsPanel === "function"){
+        window.renderOpsPanel();
+      }
+    }catch(e){}
+  }
+
+  // renderOpsPanel varsa sar (aktif ürün varsa loadDB'yi geçici filtrele)
+  function wrapOps(){
+    if(window.__V46_OPS_WRAPPED_ONCE) return;
+    if(typeof window.renderOpsPanel !== "function") return;
+
+    const orig = window.renderOpsPanel;
+
+    window.renderOpsPanel = function(){
+      const pid = activePid();
+      if(!pid){
+        try{ orig(); }catch(e){}
+        return;
+      }
+
+      const _load = window.loadDB;
+      if(typeof _load === "function"){
+        window.loadDB = function(){
+          const db = _load();
+          try{
+            db.ops = (db.ops||[]).filter(o => o && o.pid === pid);
+            // ops ekranında ürün adı vs. için lazım olabiliyor, tek ürüne indiriyoruz
+            db.products = (db.products||[]).filter(p => p && p.id === pid);
+          }catch(e){}
+          return db;
+        };
+      }
+
+      try{
+        orig();
+      } finally {
+        if(typeof _load === "function") window.loadDB = _load;
+      }
+    };
+
+    window.__V46_OPS_WRAPPED_ONCE = true;
+  }
+
+  // İlk dene (bazı sürümlerde renderOpsPanel daha sonra geliyor)
+  wrapOps();
+
+  // Sonradan gelirse de sar
+  const t = setInterval(()=>{
+    if(typeof window.renderOpsPanel === "function"){
+      try{ wrapOps(); }catch(e){}
+      clearInterval(t);
+    }
+  }, 120);
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    // aktif ürün değişince ops yenile
+    try{
+      const sel = document.getElementById("globalProdSelect");
+      if(sel){
+        sel.addEventListener("change", ()=>{
+          try{ wrapOps(); }catch(e){}
+          safeRenderOps();
+        });
+      }
+    }catch(e){}
+
+    // “İşlem” sekmesine basınca da hemen render et (bottom nav + eski tab sistemi)
+    try{
+      const navOps = document.querySelector('[data-v291="cardOps"]');
+      if(navOps){
+        navOps.addEventListener("click", ()=>{
+          try{ wrapOps(); }catch(e){}
+          setTimeout(safeRenderOps, 0);
+        });
+      }
+    }catch(e){}
+
+    try{
+      const tabOps = document.querySelector('[data-tab="ops"]');
+      if(tabOps){
+        tabOps.addEventListener("click", ()=>{
+          try{ wrapOps(); }catch(e){}
+          setTimeout(safeRenderOps, 0);
+        });
+      }
+    }catch(e){}
+  });
+
+  window.__V46_WRAPPED_OPS = true;
 })();
 
 </script>
