@@ -920,7 +920,7 @@ main{ padding-bottom: 92px !important; }
   </div>
 
   <div style="margin-top:8px">
-    <span class="modeSwitch" onclick="toggleCompact()">
+    <span class="modeSwitch" >
       ⚙ Detay Modu Aç/Kapat
     </span>
   </div>
@@ -1278,6 +1278,7 @@ try{
 
 /* V72_FREEZE_BLACKBOX */
 /* V73B_FIX_TOGGLECOMPACT */
+/* V74_FIX_COMPACT_BINDING */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -5677,6 +5678,26 @@ injectBar();
   });
 
 })();
+
+/* V74_FIX_COMPACT_BINDING */
+window.toggleCompact = function(){
+  try{
+    document.body.classList.toggle("compact-mode");
+  }catch(e){}
+};
+
+document.addEventListener("DOMContentLoaded", function(){
+  try{
+    var btns = document.querySelectorAll('[data-compact-btn], .compactBtn, #btnCompact');
+    btns.forEach(function(b){
+      b.addEventListener("click", function(e){
+        e.preventDefault();
+        window.toggleCompact();
+      });
+    });
+  }catch(e){}
+});
+
 </script>
 
 </body>
