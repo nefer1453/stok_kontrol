@@ -942,6 +942,7 @@ main{ padding-bottom: 92px !important; }
 /* V32_REPORT_FILTER_ACTIVE_PRODUCT + FIX_B15 */
 /* V43_SYNC_SELECTS_OPS_FILTER */
 /* V44_ALARM_7_15_30 */
+/* V45_ALARM_FOLLOWS_ACTIVE_PRODUCT */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -3552,6 +3553,98 @@ window.setActivePid = function(pid){
     // ilk kurulum: kayıtlı değer
     try{ window.setAlarmDaysV44(getSaved()); }catch(e){}
   });
+})();
+
+
+
+/* V45_ALARM_FOLLOWS_ACTIVE_PRODUCT */
+(function(){
+  if(window.__V45_WRAPPED_ALARM) return;
+
+  // 1) Aktif ürün id'sini NOKTA ATIŞI yakala (globalProdSelect)
+  function activePid(){
+    try{
+      const sel = document.getElementById("globalProdSelect");
+      if(sel && sel.value && sel.value!=="all" && sel.value!=="*") return String(sel.value);
+    }catch(e){}
+    // 2) varsa eski getActivePid fallback (V32)
+    try{
+      if(window.getActivePid){
+        const v = window.getActivePid();
+        if(v && v!=="all" && v!=="*") return String(v);
+      }
+    }catch(e){}
+    return "";
+  }
+
+  // getActivePid'i güçlendir: globalProdSelect'i daima öne al
+  try{
+    const oldGet = window.getActivePid;
+    window.getActivePid = function(){
+      const pid = activePid();
+      if(pid) return pid;
+      try{ return oldGet ? oldGet() : ""; }catch(e){ return ""; }
+    };
+  }catch(e){}
+
+  // renderAlarm yoksa çık
+  const orig = window.renderAlarm;
+  if(typeof orig !== "function"){
+    console.log("V45: renderAlarm yok, pas geçtim.");
+    return;
+  }
+
+  // 3) renderAlarm'ı sar: aktif ürün varsa loadDB'yi geçici filtrele
+  window.renderAlarm = function(){
+    const pid = activePid();
+
+    // aktif ürün yoksa normal çalış
+    if(!pid){
+      try{ orig(); }catch(e){}
+      return;
+    }
+
+    const _load = window.loadDB;
+    if(typeof _load === "function"){
+      window.loadDB = function(){
+        const db = _load();
+        try{
+          db.ops = (db.ops||[]).filter(o => o && o.pid === pid);
+          db.products = (db.products||[]).filter(p => p && p.id === pid);
+        }catch(e){}
+        return db;
+      };
+    }
+
+    try{
+      orig();
+    } finally {
+      if(typeof _load === "function") window.loadDB = _load;
+    }
+
+    // küçük bilgi notu
+    try{
+      const info = document.getElementById("alarmInfo");
+      if(info){
+        const t = (info.textContent||"").trim();
+        info.textContent = (t ? (t+" • ") : "") + "aktif ürün";
+      }
+    }catch(e){}
+  };
+
+  // 4) Aktif ürün değişince Alarm yenile
+  document.addEventListener("DOMContentLoaded", ()=>{
+    try{
+      const sel = document.getElementById("globalProdSelect");
+      if(sel){
+        sel.addEventListener("change", ()=>{
+          try{ window.renderAlarm(); }catch(e){}
+        });
+      }
+    }catch(e){}
+  });
+
+  window.__V45_WRAPPED_ALARM = true;
 })();
 
 </script>
