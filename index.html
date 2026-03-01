@@ -725,6 +725,23 @@ main{ padding-bottom: 92px !important; }
   margin-top:4px;
 }
 
+
+/* V59_FOCUS_TOGGLE_CLEAR_ACTIVE */
+.focusBtn{
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 950;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.focusBtnOff{
+  color: var(--muted);
+  background: rgba(255,255,255,.04);
+}
+
 </style>
 </head>
 <body>
@@ -756,6 +773,7 @@ main{ padding-bottom: 92px !important; }
     <div class="row">
       <span class="globalTag">🎯 Aktif Ürün</span>
       <select id="globalProdSelect"></select>
+      <button class="focusBtn" id="btnFocusToggle" type="button" title="Odak: Açık/kapalı">🎯 Odak</button>
       <button class="btn smallBtn" id="btnGlobalProdClear" type="button">Temizle</button>
     </div>
     <div class="hint" id="globalProdHint" style="margin-top:8px">
@@ -1062,6 +1080,7 @@ try{
 
 /* V56_OPS_VIRTUAL_RENDER */
 /* V58_ACTIVE_PRODUCT_DRIVES_ALL */
+/* V59_FOCUS_TOGGLE_CLEAR_ACTIVE */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -4740,6 +4759,90 @@ head.innerHTML = '<div class="opsMiniRow">'+
       if(bind()){ clearInterval(iv); return; }
       if(t >= 30){ clearInterval(iv); } // ~3sn
     }, 100);
+  });
+})();
+
+
+/* V59_FOCUS_TOGGLE_CLEAR_ACTIVE */
+(function(){
+  const KEY_ACTIVE = "stok_active_pid";
+  const KEY_FOCUS  = "stok_focus_on_v59"; // "1" / "0"
+
+  function setBtnState(on){
+    const b = document.getElementById("btnFocusToggle");
+    if(!b) return;
+    b.classList.toggle("focusBtnOff", !on);
+    b.textContent = on ? "🎯 Odak: Açık" : "🎯 Odak: Kapalı";
+  }
+
+  function isOn(){
+    try{ return (localStorage.getItem(KEY_FOCUS) || "1") !== "0"; }catch(e){}
+    return true;
+  }
+
+  function setOn(v){
+    try{ localStorage.setItem(KEY_FOCUS, v ? "1" : "0"); }catch(e){}
+    setBtnState(v);
+  }
+
+  function clearActiveEverywhere(){
+    // select'i boşla (varsa)
+    try{
+      const sel = document.getElementById("globalProdSelect");
+      if(sel) sel.value = "";
+    }catch(e){}
+
+    // global state temizle
+    try{ window.ACTIVE_PID = ""; }catch(e){}
+    try{ window.__OPS_FILTER_PID = ""; }catch(e){}
+    try{ window.REPORT_PID = ""; }catch(e){}
+    try{ localStorage.removeItem(KEY_ACTIVE); }catch(e){}
+
+    // ekranları tazele
+    try{ window.renderProducts && window.renderProducts(); }catch(e){}
+    try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+    try{ window.reportToday && window.reportToday(); }catch(e){}
+    try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+  }
+
+  function applyFocusRule(){
+    const on = isOn();
+    setBtnState(on);
+
+    // Odak kapalıysa: aktif pid'i sıfırla (tam geniş görünüm)
+    if(!on){
+      clearActiveEverywhere();
+    }else{
+      // Odak açıksa: mevcut seçimi uygulat (V58 varsa onun change handler'ı zaten sürer)
+      try{
+        const sel = document.getElementById("globalProdSelect");
+        if(sel){
+          const pid = String(sel.value||"");
+          // pid varsa V58 bunu zaten yayar; yoksa da sorun değil.
+          // yine de rapor/ops/alarm tazele:
+          try{ window.renderProducts && window.renderProducts(); }catch(e){}
+          try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+          try{ window.reportToday && window.reportToday(); }catch(e){}
+          try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+        }
+      }catch(e){}
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    // buton varsa bağla
+    const b = document.getElementById("btnFocusToggle");
+    if(b && !b.__bound){
+      b.__bound = true;
+      b.addEventListener("click", ()=>{
+        const on = isOn();
+        setOn(!on);
+        applyFocusRule();
+      });
+    }
+
+    // açılışta state uygula
+    applyFocusRule();
   });
 })();
 
