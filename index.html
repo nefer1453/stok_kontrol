@@ -1061,6 +1061,7 @@ try{
 }catch(e){}
 
 /* V56_OPS_VIRTUAL_RENDER */
+/* V58_ACTIVE_PRODUCT_DRIVES_ALL */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -4675,6 +4676,71 @@ head.innerHTML = '<div class="opsMiniRow">'+
   }
 
   document.addEventListener("DOMContentLoaded", hook);
+})();
+
+
+/* V58_ACTIVE_PRODUCT_DRIVES_ALL */
+(function(){
+  const KEY = "stok_active_pid";
+
+  function readSel(){
+    try{
+      const sel = document.getElementById("globalProdSelect");
+      if(sel && sel.value) return String(sel.value||"");
+    }catch(e){}
+    return "";
+  }
+
+  function applyPid(pid){
+    try{ window.ACTIVE_PID = pid || ""; }catch(e){}
+    try{ window.__OPS_FILTER_PID = pid || ""; }catch(e){}
+    try{ window.REPORT_PID = pid || ""; }catch(e){}
+    try{ localStorage.setItem(KEY, pid || ""); }catch(e){}
+
+    // ekranları tazele (varsa)
+    try{ window.renderProducts && window.renderProducts(); }catch(e){}
+    try{ window.renderOpsPanel && window.renderOpsPanel(); }catch(e){}
+    try{ window.reportToday && window.reportToday(); }catch(e){}
+    try{ window.renderAlarm && window.renderAlarm(); }catch(e){}
+  }
+
+  function bind(){
+    const sel = document.getElementById("globalProdSelect");
+    if(!sel) return false;
+
+    // seçenekler doldu mu? (en az 1 option)
+    if(!sel.options || sel.options.length < 1) return false;
+
+    // açılışta eski seçimi yükle
+    let saved = "";
+    try{ saved = localStorage.getItem(KEY) || ""; }catch(e){}
+    if(saved){
+      try{ sel.value = saved; }catch(e){}
+      applyPid(saved);
+    }else{
+      // hiç kayıt yoksa mevcut value’yu uygula (varsa)
+      const cur = readSel();
+      if(cur) applyPid(cur);
+    }
+
+    // değişince her yere uygula
+    sel.addEventListener("change", ()=>{
+      const pid = readSel();
+      applyPid(pid);
+    });
+
+    return true;
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    // bazı cihazlarda select options geç doluyor → kısa bir bekleme/poll
+    let t=0;
+    const iv = setInterval(()=>{
+      t += 1;
+      if(bind()){ clearInterval(iv); return; }
+      if(t >= 30){ clearInterval(iv); } // ~3sn
+    }, 100);
+  });
 })();
 
 </script>
