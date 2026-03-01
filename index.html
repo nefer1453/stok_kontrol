@@ -688,6 +688,25 @@ main{ padding-bottom: 92px !important; }
 }
 .focusPill b{ color:#fff; }
 
+
+/* V56_OPS_VIRTUAL_RENDER */
+.opsMiniRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.opsMiniMeta{
+  font-size:12px;
+  opacity:.85;
+}
+.opsLoadBtn{
+  width:100%;
+  margin-top:10px;
+  border-radius:999px;
+  font-weight:950;
+}
+
 </style>
 </head>
 <body>
@@ -1023,6 +1042,7 @@ try{
   if(typeof window.__AUTO_REPORT === "undefined") window.__AUTO_REPORT = false;
 }catch(e){}
 
+/* V56_OPS_VIRTUAL_RENDER */
 /* ====== CORE DB ====== */
 // V15: Undo / Delete altyapısı
 function ensureMeta(db){
@@ -4480,6 +4500,148 @@ document.addEventListener("DOMContentLoaded", ()=>{
     }
   }catch(e){}
 });
+
+
+/* V56_OPS_VIRTUAL_RENDER */
+(function(){
+  // Ayarlar: batch render
+  const BATCH = 40;        // her seferde kaç satır basılsın
+  const TICK  = 0;         // 0ms yield (UI nefes alsın)
+
+  function $(id){ return document.getElementById(id); }
+
+  function safe(fn){ try{ return fn(); }catch(e){ return null; } }
+
+  function esc(s){
+    try{
+      return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }catch(e){ return ""; }
+  }
+
+  function prodName(db, pid){
+    try{
+      const p = (db.products||[]).find(x=>x.id===pid);
+      return p ? (p.name||pid.slice(0,8)) : (pid?pid.slice(0,8):"");
+    }catch(e){ return pid?pid.slice(0,8):""; }
+  }
+
+  function typeLabel(o){
+    return (o.typeLabel || o.type || "");
+  }
+
+  function fmtDT(ts){
+    try{ return new Date(Number(ts||0)).toLocaleString("tr-TR"); }catch(e){ return ""; }
+  }
+
+  function buildOpsArray(db){
+    let ops = (db.ops||[]).slice();
+    ops.sort((a,b)=>(Number(b.ts||0)-Number(a.ts||0)));
+
+    // Ürün filtresi (Ürün kartındaki “İşlemler” butonu bunu set ediyordu)
+    const pid = safe(()=>window.__OPS_FILTER_PID) || "";
+    if(pid){
+      ops = ops.filter(o=>o && o.pid===pid);
+    }
+    return ops;
+  }
+
+  function renderOpsVirtual(){
+    const list = $("opsList");
+    if(!list) return;
+
+    const db = safe(()=>loadDB()) || {products:[], ops:[]};
+    const ops = buildOpsArray(db);
+
+    list.innerHTML = "";
+
+    if(!ops.length){
+      list.innerHTML = '<div class="item"><div class="hint">İşlem yok.</div></div>';
+      return;
+    }
+
+    // başlık gibi mini bilgi
+    const head = document.createElement("div");
+    head.className = "item";
+    head.innerHTML = '<div class="opsMiniRow"><div class="name">Son İşlemler</div><div class="opsMiniMeta">Toplam: <b>'+ops.length+'</b></div></div>';
+    list.appendChild(head);
+
+    let i = 0;
+    const total = ops.length;
+
+    const moreBtn = document.createElement("button");
+    moreBtn.className = "btn opsLoadBtn";
+    moreBtn.type = "button";
+
+    function paintBatch(){
+      const end = Math.min(i + BATCH, total);
+      for(; i<end; i++){
+        const o = ops[i];
+        const pid = o.pid || "";
+        const pname = prodName(db, pid);
+
+        const dir = (o.dir==="-" ? "−" : "+");
+        const qty = Number(o.qty||0);
+        const unit = (o.unitMode==="koli" ? "koli" : "adet");
+        const sub = (o.sub||"");
+        const note = (o.note||"");
+
+        const row = document.createElement("div");
+        row.className = "item";
+        row.innerHTML = `
+          <div class="row" style="justify-content:space-between;gap:10px">
+            <div class="name" style="flex:1;min-width:0">${esc(pname)}</div>
+            <div class="tag">${dir}${qty} ${esc(unit)}</div>
+          </div>
+          <div class="muted">${esc(typeLabel(o))}${sub?(" • "+esc(sub)):""}${note?(" • "+esc(note)):""}</div>
+          <div class="opsMiniMeta">${esc(fmtDT(o.ts))}</div>
+        `;
+        list.appendChild(row);
+      }
+
+      if(i < total){
+        moreBtn.textContent = "Daha fazla göster ("+(total-i)+")";
+        if(!moreBtn.isConnected) list.appendChild(moreBtn);
+      }else{
+        if(moreBtn.isConnected) moreBtn.remove();
+      }
+    }
+
+    moreBtn.onclick = ()=>{
+      // kullanıcı basınca bir batch daha
+      setTimeout(paintBatch, TICK);
+    };
+
+    // İlk batch’i parça parça basalım (UI donmasın)
+    setTimeout(paintBatch, TICK);
+  }
+
+  // Mevcut renderOpsPanel varsa override et (en güvenli: dışarıyı bozmadan)
+  function hook(){
+    // Ops paneli var mı?
+    if(!$("opsList")) return;
+
+    // Orijinali sakla (istersek geri döneriz)
+    if(!window.__V56_ORIG_OPS && typeof window.renderOpsPanel === "function"){
+      window.__V56_ORIG_OPS = window.renderOpsPanel;
+    }
+
+    window.renderOpsPanel = renderOpsVirtual;
+
+    // Ops sekmesine girince de çiz
+    try{
+      // V291 bottom nav
+      const btn = document.querySelector('[data-v291="cardOps"]');
+      if(btn){
+        btn.addEventListener("click", ()=>{ try{ renderOpsVirtual(); }catch(e){} });
+      }
+    }catch(e){}
+
+    // İlk açılışta da çiz (ops panel açık olmasa bile sorun değil)
+    try{ renderOpsVirtual(); }catch(e){}
+  }
+
+  document.addEventListener("DOMContentLoaded", hook);
+})();
 
 </script>
 
